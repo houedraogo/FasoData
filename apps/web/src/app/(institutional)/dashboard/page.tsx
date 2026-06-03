@@ -136,10 +136,20 @@ function Modal({ open, onClose, title, children }: {
   );
 }
 
+// ── Type programme ────────────────────────────────────────────────────────────
+interface Programme {
+  id: number; nom: string; type: string; regions: string[];
+  debut: string; fin: string; objectif: string; createdAt: Date;
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const { user, fetchMe } = useAuth();
   const [showNouveauProg, setShowNouveauProg] = useState(false);
+
+  // Programmes créés par l'utilisateur (état local — sera remplacé par API)
+  const [programmes, setProgrammes] = useState<Programme[]>([]);
+  const hasPrograms = programmes.length > 0;
 
   // Formulaire nouveau programme
   const [prog, setProg] = useState({
@@ -183,6 +193,10 @@ export default function DashboardPage() {
 
   const handleCreateProg = () => {
     if (!prog.nom.trim()) { toast.error("Le nom du programme est requis"); return; }
+    const newProg: Programme = {
+      id: Date.now(), ...prog, createdAt: new Date(),
+    };
+    setProgrammes((prev) => [...prev, newProg]);
     toast.success(`Programme "${prog.nom}" créé avec succès !`);
     setShowNouveauProg(false);
     setProg({ nom: "", type: "Sécurité alimentaire", regions: [], debut: "", fin: "", objectif: "" });
@@ -194,20 +208,46 @@ export default function DashboardPage() {
   return (
     <div className="p-6 lg:p-8 space-y-6">
 
+      {/* Bannière données de démonstration (uniquement si aucun programme créé) */}
+      {!hasPrograms && (
+        <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+          <span className="text-amber-500 text-lg">📊</span>
+          <p className="text-sm text-amber-800 flex-1">
+            <span className="font-semibold">Données de démonstration</span> — Les graphiques ci-dessous affichent des exemples.
+            Créez votre premier programme pour voir vos vraies données.
+          </p>
+          <button
+            onClick={() => setShowNouveauProg(true)}
+            className="text-xs font-semibold text-amber-800 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition-colors shrink-0"
+          >
+            Créer un programme →
+          </button>
+        </div>
+      )}
+
       {/* En-tête */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <div className="flex items-center gap-3 mb-1">
-            <span className="text-xs font-semibold text-white bg-[#1A2C42] px-3 py-1 rounded-full">
-              3 programmes actifs
-            </span>
+            {hasPrograms ? (
+              <span className="text-xs font-semibold text-white bg-[#1A2C42] px-3 py-1 rounded-full">
+                {programmes.length} programme{programmes.length > 1 ? "s" : ""} actif{programmes.length > 1 ? "s" : ""}
+              </span>
+            ) : (
+              <span className="text-xs font-semibold text-amber-700 bg-amber-100 border border-amber-200 px-3 py-1 rounded-full">
+                Aucun programme · Démo
+              </span>
+            )}
             <span className="text-xs text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
               Période : 1er trim. 2025
             </span>
           </div>
           <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 mt-3">
-            Bonjour {firstName}. Voici le pouls de vos programmes.
+            Bonjour {firstName}. {hasPrograms ? "Voici le pouls de vos programmes." : "Bienvenue sur FasoData !"}
           </h1>
+          {!hasPrograms && (
+            <p className="text-gray-400 text-sm mt-1">Commencez par créer votre premier programme pour suivre vos indicateurs.</p>
+          )}
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -261,6 +301,37 @@ export default function DashboardPage() {
           color="#16A34A"
         />
       </div>
+
+      {/* Mes programmes (si au moins 1 créé) */}
+      {hasPrograms && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <span className="w-1 h-4 bg-[#1A2C42] rounded-full block" />
+              <h2 className="font-bold text-gray-900 text-sm">Mes programmes</h2>
+            </div>
+            <button onClick={() => setShowNouveauProg(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1A2C42] text-white rounded-lg text-xs font-semibold">
+              <Plus className="w-3 h-3" /> Nouveau
+            </button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {programmes.map((p) => (
+              <div key={p.id} className="border border-gray-100 rounded-xl p-4 hover:border-[#1A2C42]/20 transition-colors">
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <p className="text-sm font-semibold text-gray-900 leading-snug">{p.nom}</p>
+                  <span className="text-[10px] bg-green-50 text-green-700 px-2 py-0.5 rounded-full font-medium shrink-0">Actif</span>
+                </div>
+                <p className="text-xs text-gray-400">{p.type}</p>
+                {p.regions.length > 0 && (
+                  <p className="text-xs text-gray-500 mt-1">{p.regions.slice(0, 2).join(", ")}{p.regions.length > 2 ? ` +${p.regions.length - 2}` : ""}</p>
+                )}
+                {p.objectif && <p className="text-xs text-[#E04E2F] font-medium mt-1.5">🎯 {p.objectif}</p>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Charts row 1 */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">

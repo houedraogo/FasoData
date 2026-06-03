@@ -1,0 +1,198 @@
+name: fasodata
+
+services:
+  # ─── Reverse Proxy ──────────────────────────────────────────────────────────
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - web
+      - api
+    networks:
+      - faso
+    restart: unless-stopped
+
+  # ─── Frontend ────────────────────────────────────────────────────────────────
+  web:
+    build:
+      context: ..
+      dockerfile: infra/docker/Dockerfile.web
+    env_file:
+      - ../.env
+    environment:
+      - NODE_ENV=development
+    volumes:
+      - ../apps/web:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - api
+    networks:
+      - faso
+    restart: unless-stopped
+
+  # ─── API FastAPI ─────────────────────────────────────────────────────────────
+  api:
+    build:
+      context: ..
+      dockerfile: infra/docker/Dockerfile.api
+    env_file:
+      - ../.env
+    volumes:
+      - ../apps/api:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      meilisearch:
+        condition: service_started
+    networks:
+      - faso
+    restart: unless-stopped
+
+  # ─── Worker Celery ───────────────────────────────────────────────────────────
+  worker:
+    build:
+      context: ..
+      dockerfile: infra/docker/Dockerfile.api
+    command: celery -A fasodata.core.celery_app worker --loglevel=info -Q default,imports,exports,prices
+    env_file:
+      - ../.env
+    volumes:
+      - ../apps/api:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - faso
+    restart: unless-stopped
+
+  # ─── Celery Beat — Planificateur de tâches (23h00 WAT agrégation SMS) ────────
+  beat:
+    build:
+      context: ..
+      dockerfile: infra/docker/Dockerfile.api
+    command: celery -A fasodata.core.celery_app beat --loglevel=info --scheduler celery.beat:PersistentScheduler
+    env_file:
+      - ../.env
+    volumes:
+      - ../apps/api:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - faso
+    restart: unless-stopped
+
+  # ─── PostgreSQL + PostGIS ────────────────────────────────────────────────────
+  db:
+    image: postgis/postgis:16-3.4-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-fasodata}
+      POSTGRES_USER: ${POSTGRES_USER:-fasodata}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme_db}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    networks:
+      - faso
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fasodata}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ─── Redis ───────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    networks:
+      - faso
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ─── MinIO (stockage fichiers S3-compatible) ──────────────────────────────────
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-fasodata}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-changeme_minio}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9001:9001"   # console MinIO (dev uniquement)
+    networks:
+      - faso
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ─── Meilisearch ─────────────────────────────────────────────────────────────
+  meilisearch:
+    image: getmeili/meilisearch:v1.7
+    environment:
+      MEILI_MASTER_KEY: ${MEILISEARCH_API_KEY:-changeme_meili}
+      MEILI_NO_ANALYTICS: "true"
+    volumes:
+      - meili_data:/meili_data
+    networks:
+      - faso
+    restart: unless-stopped
+
+  # ─── Monitoring ──────────────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./docker/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - faso
+    restart: unless-stopped
+    profiles: ["monitoring"]
+
+  grafana:
+    image: grafana/grafana:latest
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./docker/grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+    ports:
+      - "3001:3000"   # Grafana UI (dev uniquement)
+    networks:
+      - faso
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    profiles: ["monitoring"]
+
+networks:
+  faso:
+    driver: bridge
+
+volumes:
+  db_data:
+  redis_data:
+  minio_data:
+  meili_data:
+  prometheus_data:
+  grafana_data:

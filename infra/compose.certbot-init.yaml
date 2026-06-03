@@ -1,0 +1,5 @@
+services:
+  nginx:
+    volumes:
+      - ./docker/nginx.prod.bootstrap.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ./certbot/www:/var/www/certbot:ro

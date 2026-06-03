@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#1A2C42"/>
+  <rect x="64" y="64" width="384" height="384" rx="64" fill="#E04E2F"/>
+  <!-- Graphique barres (données) -->
+  <rect x="120" y="280" width="48" height="112" rx="8" fill="white" opacity="0.95"/>
+  <rect x="192" y="224" width="48" height="168" rx="8" fill="white" opacity="0.95"/>
+  <rect x="264" y="168" width="48" height="224" rx="8" fill="white" opacity="0.95"/>
+  <rect x="336" y="120" width="48" height="272" rx="8" fill="white" opacity="0.95"/>
+  <!-- Ligne de tendance -->
+  <polyline points="144,260 216,204 288,148 360,104"
+    fill="none" stroke="#F5A623" stroke-width="16"
+    stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Point doré -->
+  <circle cx="360" cy="104" r="16" fill="#F5A623"/>
+</svg>

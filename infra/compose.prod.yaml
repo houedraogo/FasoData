@@ -1,0 +1,64 @@
+services:
+  nginx:
+    command: >
+      sh -c "while true; do
+        sleep 6h;
+        nginx -s reload;
+      done & nginx -g 'daemon off;'"
+    ports:
+      - "80:80"
+      - "443:443"
+    env_file:
+      - ../.env.prod
+    volumes:
+      - ./docker/nginx.prod.base.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/nginx.prod.https.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ./certbot/www:/var/www/certbot:ro
+      - ./certbot/conf:/etc/letsencrypt:ro
+
+  certbot:
+    image: certbot/certbot:v2.11.0
+    env_file:
+      - ../.env.prod
+    volumes:
+      - ./certbot/www:/var/www/certbot
+      - ./certbot/conf:/etc/letsencrypt
+    entrypoint: >
+      sh -c "trap exit TERM;
+      while :; do
+        certbot renew --webroot -w /var/www/certbot --quiet;
+        sleep 12h & wait $${!};
+      done"
+    networks:
+      - faso
+    restart: unless-stopped
+
+  web:
+    env_file:
+      - ../.env.prod
+    environment:
+      - NODE_ENV=production
+    command: sh -c "npm run build && npm run start"
+    volumes: []
+
+  api:
+    env_file:
+      - ../.env.prod
+    command: uvicorn fasodata.main:app --host 0.0.0.0 --port 8000
+    volumes: []
+
+  worker:
+    env_file:
+      - ../.env.prod
+    volumes: []
+
+  beat:
+    env_file:
+      - ../.env.prod
+    volumes: []
+
+  minio:
+    ports: []
+
+  grafana:
+    ports: []

@@ -1,0 +1,29 @@
+fastapi[all]==0.115.5
+uvicorn[standard]==0.30.6
+sqlalchemy[asyncio]==2.0.36
+asyncpg==0.29.0
+alembic==1.13.3
+pydantic-settings==2.6.1
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==3.2.2
+python-multipart==0.0.12
+celery[redis]==5.3.6
+redis==5.0.8
+minio==7.2.10
+meilisearch==0.31.4
+pandas==2.2.3
+openpyxl==3.1.5
+# geoalchemy2==0.15.2   # nécessite GDAL, activé en prod
+# shapely==2.0.6        # idem
+httpx==0.27.2
+prometheus-fastapi-instrumentator==7.0.0
+python-slugify==8.0.4
+psycopg2-binary==2.9.10
+aiofiles==24.1.0
+pytest==8.3.3
+pytest-asyncio==0.23.8
+pytest-cov==5.0.0
+ruff==0.7.2
+aiosqlite==0.20.0
+africastalking==1.2.5          # SMS Burkina Faso / sandbox gratuit

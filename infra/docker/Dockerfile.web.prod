@@ -1,0 +1,35 @@
+# ── Stage 1 : Build ──────────────────────────────────────────────────────────
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Dépendances
+COPY apps/web/package*.json ./
+RUN npm install --legacy-peer-deps
+
+# Sources
+COPY apps/web/ .
+
+# Variables next.js build-time (remplacées par les vraies valeurs au runtime)
+ARG NEXT_PUBLIC_API_URL=https://fasodata.hamed-vps.cloud/api
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
+# Build Next.js en mode production
+ENV NODE_ENV=production
+RUN npm run build
+
+# ── Stage 2 : Runtime (image finale légère) ───────────────────────────────────
+FROM node:20-alpine AS runner
+
+WORKDIR /app
+ENV NODE_ENV=production
+
+# Copier uniquement ce qui est nécessaire au runtime
+COPY --from=builder /app/public          ./public
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static    ./.next/static
+
+EXPOSE 3000
+
+# Lancer Next.js en mode production (serveur standalone)
+CMD ["node", "server.js"]

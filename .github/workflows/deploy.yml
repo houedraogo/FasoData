@@ -1,0 +1,101 @@
+name: 🚀 Déploiement FasoData → VPS
+
+on:
+  push:
+    branches:
+      - main        # Push sur main → déploiement automatique
+  workflow_dispatch:  # Déclenchement manuel depuis GitHub
+
+env:
+  VPS_HOST: 145.223.103.103
+  VPS_USER: root
+  APP_DIR:  /opt/fasodata
+
+jobs:
+  deploy:
+    name: Déployer sur VPS Hostinger
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+
+      # ── 1. Récupérer le code ──────────────────────────────────────────────
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      # ── 2. Vérifier la config SSH ─────────────────────────────────────────
+      - name: 🔑 Configurer SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
+
+      - name: ✅ Tester la connexion SSH
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ env.VPS_USER }}@${{ env.VPS_HOST }} \
+            "echo '✅ Connexion SSH OK' && uname -a"
+
+      # ── 3. Synchroniser le code vers le VPS ──────────────────────────────
+      - name: 📤 Synchroniser les fichiers (rsync)
+        run: |
+          rsync -avz --delete \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='.next' \
+            --exclude='__pycache__' \
+            --exclude='*.pyc' \
+            --exclude='.env' \
+            --exclude='.env.production' \
+            --exclude='*.log' \
+            --exclude='celerybeat*' \
+            -e "ssh -o StrictHostKeyChecking=no" \
+            ./ ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:${{ env.APP_DIR }}/
+
+      # ── 4. Rebuild et redémarrage sur le VPS ─────────────────────────────
+      - name: 🔨 Rebuild Docker + Redémarrage
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ env.VPS_USER }}@${{ env.VPS_HOST }} << 'ENDSSH'
+            set -e
+            cd /opt/fasodata
+
+            echo "📦 Rebuild de l'API..."
+            docker compose -f infra/compose.prod.yml --env-file .env.production build api
+
+            echo "🌐 Rebuild du Frontend..."
+            docker compose -f infra/compose.prod.yml --env-file .env.production build web
+
+            echo "🔄 Redémarrage des services..."
+            docker compose -f infra/compose.prod.yml --env-file .env.production stop api worker beat web
+            docker compose -f infra/compose.prod.yml --env-file .env.production rm -f api worker beat web
+            docker compose -f infra/compose.prod.yml --env-file .env.production up -d
+
+            echo "⏳ Attente démarrage (15s)..."
+            sleep 15
+
+            echo "✅ État des containers :"
+            docker compose -f infra/compose.prod.yml ps
+          ENDSSH
+
+      # ── 5. Vérification santé de l'API ────────────────────────────────────
+      - name: 🏥 Test de santé post-déploiement
+        run: |
+          sleep 10
+          HTTP_CODE=$(curl -sk -o /dev/null -w "%{http_code}" https://fasodata.com/api/health)
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ API opérationnelle (HTTP $HTTP_CODE)"
+          else
+            echo "❌ API inaccessible (HTTP $HTTP_CODE)"
+            exit 1
+          fi
+
+      # ── 6. Notification (optionnel) ───────────────────────────────────────
+      - name: 📊 Résumé du déploiement
+        if: always()
+        run: |
+          echo "## 🚀 Déploiement FasoData" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Infos | Valeur |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| Branche | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Commit | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Déclenché par | ${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| URL | https://fasodata.com |" >> $GITHUB_STEP_SUMMARY

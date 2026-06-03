@@ -1,0 +1,62 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+dist/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+.next/
+.turbo/
+out/
+build/
+
+# Env
+.env
+.env.local
+.env.production
+*.env
+
+# Docker
+data/
+volumes/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Uploads
+uploads/
+tmp/
+
+# Clés SSH et secrets
+*.pem
+*.key
+*.p12
+celerybeat-schedule
+celerybeat.pid
+
+# Logs
+*.log
+logs/
+
+# Tests
+.coverage
+htmlcov/
+
+# Docker volumes
+db_data/
+redis_data/
+minio_data/
+meili_data/

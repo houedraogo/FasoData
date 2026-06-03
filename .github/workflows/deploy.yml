@@ -64,12 +64,12 @@ jobs:
             docker compose -f infra/compose.prod.yml --env-file .env.production build web
 
             echo "🔄 Redémarrage des services..."
-            docker compose -f infra/compose.prod.yml --env-file .env.production stop api worker beat web
-            docker compose -f infra/compose.prod.yml --env-file .env.production rm -f api worker beat web
+            docker compose -f infra/compose.prod.yml --env-file .env.production stop nginx api worker beat web
+            docker compose -f infra/compose.prod.yml --env-file .env.production rm -f nginx api worker beat web
             docker compose -f infra/compose.prod.yml --env-file .env.production up -d
 
-            echo "⏳ Attente démarrage (15s)..."
-            sleep 15
+            echo "⏳ Attente démarrage (45s)..."
+            sleep 45
 
             echo "✅ État des containers :"
             docker compose -f infra/compose.prod.yml ps

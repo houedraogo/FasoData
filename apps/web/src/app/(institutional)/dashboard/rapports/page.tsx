@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   FileDown, Loader2, CheckCircle2, Clock, AlertTriangle,
-  Download, Database, Filter, RefreshCw, FileText,
+  Download, Database, Filter, RefreshCw, FileText, TrendingUp,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatBytes, formatDate } from "@/lib/utils";
@@ -50,11 +50,14 @@ function StatusBadge({ status }: { status: ExportJob["status"] }) {
 // ── Page principale ───────────────────────────────────────────────────────────
 
 export default function RapportsPage() {
-  const [selectedId, setSelectedId]     = useState("");
-  const [selectedName, setSelectedName] = useState("");
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [selectedId, setSelectedId]       = useState("");
+  const [selectedName, setSelectedName]   = useState("");
+  const [isGenerating, setIsGenerating]   = useState(false);
   const [isPdfGenerating, setIsPdfGenerating] = useState(false);
-  const [jobs, setJobs]                 = useState<ExportJob[]>([]);
+  const [isPrixPdf, setIsPrixPdf]         = useState(false);
+  const [prixCountry, setPrixCountry]     = useState("BFA");
+  const [prixMonths, setPrixMonths]       = useState(3);
+  const [jobs, setJobs]                   = useState<ExportJob[]>([]);
 
   // Polling refs pour les tâches en cours
   const pollingRefs = useRef<Record<string, ReturnType<typeof setInterval>>>({});
@@ -155,6 +158,26 @@ export default function RapportsPage() {
     }
   };
 
+  const handleGeneratePrixPdf = async () => {
+    setIsPrixPdf(true);
+    try {
+      const params = new URLSearchParams({ country: prixCountry, months: String(prixMonths) });
+      const response = await api.post(`/reports/prix/pdf?${params}`, {}, { responseType: "blob" });
+      const blob = new Blob([response.data], { type: "application/pdf" });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement("a");
+      a.href = url;
+      a.download = `prix-alimentaires-${prixCountry.toLowerCase()}-${new Date().toISOString().slice(0, 10)}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Rapport des prix téléchargé !");
+    } catch {
+      toast.error("Impossible de générer le rapport des prix");
+    } finally {
+      setIsPrixPdf(false);
+    }
+  };
+
   return (
     <div className="p-6 lg:p-8 max-w-4xl space-y-6">
 
@@ -242,6 +265,65 @@ export default function RapportsPage() {
             </div>
           ) : null;
         })()}
+      </div>
+
+      {/* ── Rapport mensuel des prix alimentaires ── */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+        <div className="flex items-center gap-2.5 mb-5 pb-4 border-b border-gray-100">
+          <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+            <TrendingUp className="w-4 h-4 text-green-700" />
+          </div>
+          <div>
+            <h2 className="font-bold text-gray-900">Rapport prix alimentaires</h2>
+            <p className="text-xs text-gray-400 mt-0.5">
+              PDF avec prix moyens WFP/SONAGESS par région et par céréale
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
+          {/* Pays */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Pays</label>
+            <select value={prixCountry} onChange={(e) => setPrixCountry(e.target.value)}
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-[#1A2C42]/20 bg-white">
+              <option value="BFA">🇧🇫 Burkina Faso</option>
+              <option value="MLI">🇲🇱 Mali</option>
+              <option value="NER">🇳🇪 Niger</option>
+            </select>
+          </div>
+
+          {/* Période */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Période</label>
+            <select value={prixMonths} onChange={(e) => setPrixMonths(Number(e.target.value))}
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-[#1A2C42]/20 bg-white">
+              <option value={1}>1 mois</option>
+              <option value={3}>3 mois</option>
+              <option value={6}>6 mois</option>
+              <option value={12}>12 mois</option>
+            </select>
+          </div>
+
+          {/* Bouton */}
+          <div className="sm:col-span-2">
+            <label className="block text-sm font-medium text-transparent mb-1.5">.</label>
+            <button onClick={handleGeneratePrixPdf} disabled={isPrixPdf}
+              className="w-full flex items-center justify-center gap-2 py-2.5 bg-[#16A34A] hover:bg-green-700 disabled:opacity-50 text-white font-semibold rounded-xl transition-colors text-sm">
+              {isPrixPdf
+                ? <><Loader2 className="w-4 h-4 animate-spin" /> Génération PDF…</>
+                : <><FileText className="w-4 h-4" /> Télécharger le rapport des prix</>}
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-4 p-3 bg-green-50 rounded-xl text-xs text-green-700 flex items-start gap-2">
+          <TrendingUp className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+          <span>
+            Données WFP VAM + SONAGESS · 3 654 observations disponibles (BFA + MLI + NER) ·
+            Prix moyens par région pour 6 céréales : maïs, mil, sorgho, riz, niébé, arachide.
+          </span>
+        </div>
       </div>
 
       {/* Historique des exports */}

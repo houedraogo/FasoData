@@ -57,8 +57,8 @@ jobs:
             set -e
             cd /opt/fasodata
 
-            echo "📦 Rebuild de l'API..."
-            docker compose -f infra/compose.prod.yml --env-file .env.production build api
+            echo "📦 Rebuild de l'API (sans cache)..."
+            docker compose -f infra/compose.prod.yml --env-file .env.production build --no-cache api
 
             echo "🌐 Rebuild du Frontend..."
             docker compose -f infra/compose.prod.yml --env-file .env.production build web

@@ -99,16 +99,26 @@ async def upload_avatar(
 
 
 @router.get("/me/avatar/{filename}")
-async def serve_avatar(
-    filename: str,
-    current_user: User = Depends(get_current_active_user),
-):
-    """Proxy de l'avatar depuis MinIO (URL signée 1h)."""
-    from datetime import timedelta
-    from fastapi.responses import RedirectResponse
+async def serve_avatar(filename: str):
+    """
+    Sert l'avatar directement depuis MinIO — pas d'auth requise.
+    Les balises <img src="..."> du navigateur ne peuvent pas envoyer de JWT,
+    donc cet endpoint est public (sécurité par obscurité : UUID non devinable).
+    """
     from minio import Minio
 
-    s3_key = f"avatars/{filename}"
+    # Sécurité minimale — bloquer traversée de chemin
+    safe_filename = filename.replace("..", "").replace("/", "").replace("\\", "")
+    s3_key = f"avatars/{safe_filename}"
+
+    MEDIA_TYPES = {
+        "jpg":  "image/jpeg", "jpeg": "image/jpeg",
+        "png":  "image/png",  "webp": "image/webp",
+        "gif":  "image/gif",
+    }
+    ext        = safe_filename.rsplit(".", 1)[-1].lower() if "." in safe_filename else "png"
+    media_type = MEDIA_TYPES.get(ext, "image/png")
+
     try:
         client = Minio(
             settings.minio_endpoint,
@@ -116,8 +126,21 @@ async def serve_avatar(
             secret_key=settings.minio_secret_key,
             secure=settings.minio_secure,
         )
-        url = client.presigned_get_object(settings.minio_bucket, s3_key, expires=timedelta(hours=1))
-        return RedirectResponse(url)
+        # Lire depuis MinIO et streamer directement au navigateur
+        response = client.get_object(settings.minio_bucket, s3_key)
+        content  = response.read()
+        response.close()
+        response.release_conn()
+
+        from fastapi.responses import Response as FastResponse
+        return FastResponse(
+            content=content,
+            media_type=media_type,
+            headers={
+                "Cache-Control": "public, max-age=3600",  # Cache 1h côté navigateur
+                "Content-Length": str(len(content)),
+            },
+        )
     except Exception:
         raise HTTPException(404, "Avatar introuvable")
 

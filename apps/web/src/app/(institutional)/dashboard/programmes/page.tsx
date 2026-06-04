@@ -12,22 +12,23 @@ import {
   Image as ImageIcon, Bell, AlertTriangle, CheckCircle,
   ChevronDown,
 } from "lucide-react";
-import { COMMODITIES, PRICE_EVOLUTION, REGIONS } from "@/lib/mockData";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import toast from "react-hot-toast";
 
-// ── Données ───────────────────────────────────────────────────────────────────
+// ── Types données prix ────────────────────────────────────────────────────────
 
-const VOLATILITY = [
-  { name: "Riz local", sigma: 38, color: "#E04E2F" },
-  { name: "Maïs",      sigma: 31, color: "#E04E2F" },
-  { name: "Mil",       sigma: 24, color: "#D97706" },
-  { name: "Sorgho",    sigma: 19, color: "#D97706" },
-  { name: "Haricot",   sigma: 14, color: "#16A34A" },
-  { name: "Niébé",     sigma: 11, color: "#16A34A" },
-];
+interface Commodity { name: string; price: number; change: number; color: string; data: number[]; }
+interface PriceEvolutionRow { month: string; sahel: number; centre: number; hauts: number; cascades: number; }
+interface RegionData { name: string; prix_mais: number; indicateur?: number; objectif?: number; }
+interface FoodPricesData {
+  commodities: Commodity[];
+  price_evolution: PriceEvolutionRow[];
+  regions: RegionData[];
+  volatility: { name: string; sigma: number }[];
+}
 
+// Données statiques (heatmap saisonnière — calculées à partir des historiques)
 const MONTHS_SHORT = ["J","F","M","A","M","J","J","A","S","O","N","D"];
 const HEATMAP = [
   { year: 2022, values: [280,275,270,265,272,290,310,325,315,295,285,278] },
@@ -35,9 +36,6 @@ const HEATMAP = [
   { year: 2024, values: [292,288,283,278,285,305,325,342,330,308,296,290] },
   { year: 2025, values: [298,295,290,285,292,312,332,null,null,null,null,null] },
 ];
-
-const REGIONAL = REGIONS.sort((a, b) => b.prix_mais - a.prix_mais)
-  .map((r) => ({ name: r.name.replace("Boucle du Mouhoun","Boucle"), value: r.prix_mais }));
 
 function heatColor(val: number | null): string {
   if (val === null) return "#F3F4F6";
@@ -137,6 +135,25 @@ export default function ProgrammesPage() {
     { id: 4, label: "Sorgho · Centre",      seuil: "> 320 CFA/kg", value: 305, alert: false },
   ]);
 
+  // ── Données prix depuis l'API ─────────────────────────────────────────────
+  const { data: foodPrices, isLoading: pricesLoading } = useQuery<FoodPricesData>({
+    queryKey: ["dashboard-food-prices"],
+    queryFn: async () => {
+      const { data } = await api.get("/dashboard/food-prices");
+      return data;
+    },
+    staleTime: 5 * 60_000,
+  });
+
+  const COMMODITIES    = foodPrices?.commodities    ?? [];
+  const PRICE_EVOLUTION = foodPrices?.price_evolution ?? [];
+  const VOLATILITY     = (foodPrices?.volatility ?? []).map((v, i) => ({
+    ...v, color: i < 2 ? "#E04E2F" : i < 4 ? "#D97706" : "#16A34A",
+  }));
+  const REGIONAL = (foodPrices?.regions ?? [])
+    .slice().sort((a, b) => b.prix_mais - a.prix_mais)
+    .map((r) => ({ name: r.name.replace("Boucle du Mouhoun", "Boucle"), value: r.prix_mais }));
+
   const { data: programs } = useQuery<Program[]>({
     queryKey: ["programs", "food_prices"],
     queryFn: async () => {
@@ -218,26 +235,9 @@ export default function ProgrammesPage() {
 
   const handleAddAlerte = () => {
     if (!newAlerte.seuil || isNaN(Number(newAlerte.seuil))) {
-      toast.error("Seuil invalide");
-      return;
+      toast.error("Seuil invalide"); return;
     }
     createAlert.mutate();
-    return;
-    const val = REGIONS.find((r) => r.name.toLowerCase().includes(newAlerte.region.toLowerCase()))?.prix_mais ?? 300;
-    const seuil = Number(newAlerte.seuil);
-    setAlertes((prev) => [
-      ...prev,
-      {
-        id:    String(Date.now()),
-        label: `${newAlerte.produit} · ${newAlerte.region}`,
-        seuil: `> ${seuil} CFA/kg`,
-        value: val,
-        alert: val > seuil,
-      },
-    ]);
-    setShowAddAlerte(false);
-    setNewAlerte({ produit: "Maïs", region: "Sahel", seuil: "320" });
-    toast.success("Alerte configurée !");
   };
 
   const handlePNG = () => {
@@ -258,7 +258,7 @@ export default function ProgrammesPage() {
   ];
 
   const PRODUITS = ["Maïs","Mil","Sorgho","Riz local","Haricot","Niébé"];
-  const REGIONS_NAMES = REGIONS.map((r) => r.name);
+  const REGIONS_NAMES = (foodPrices?.regions ?? []).map((r) => r.name);
 
   return (
     <div className="p-6 lg:p-8 space-y-6">
@@ -300,20 +300,29 @@ export default function ProgrammesPage() {
 
       {/* KPI céréales */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        {COMMODITIES.map((c) => (
-          <div key={c.name} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-medium text-gray-700">{c.name}</p>
-              <span className={cn("w-2 h-2 rounded-full", c.change > 0 ? "bg-[#E04E2F]" : "bg-[#16A34A]")} />
+        {pricesLoading
+          ? Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 animate-pulse">
+                <div className="h-4 bg-gray-100 rounded w-16 mb-3" />
+                <div className="h-8 bg-gray-100 rounded w-20 mb-1" />
+                <div className="h-3 bg-gray-100 rounded w-12" />
+              </div>
+            ))
+          : COMMODITIES.map((c) => (
+            <div key={c.name} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-gray-700">{c.name}</p>
+                <span className={cn("w-2 h-2 rounded-full", c.change > 0 ? "bg-[#E04E2F]" : "bg-[#16A34A]")} />
+              </div>
+              <p className="text-2xl font-bold text-gray-900">
+                {c.price} <span className="text-xs font-normal text-gray-400">CFA/kg</span>
+              </p>
+              <p className={cn("text-xs font-semibold mt-1", c.change > 0 ? "text-[#E04E2F]" : "text-[#16A34A]")}>
+                {c.change > 0 ? "↑" : "↓"} {Math.abs(c.change)}%
+              </p>
             </div>
-            <p className="text-2xl font-bold text-gray-900">
-              {c.price} <span className="text-xs font-normal text-gray-400">CFA/kg</span>
-            </p>
-            <p className={cn("text-xs font-semibold mt-1", c.change > 0 ? "text-[#E04E2F]" : "text-[#16A34A]")}>
-              {c.change > 0 ? "↑" : "↓"} {Math.abs(c.change)}%
-            </p>
-          </div>
-        ))}
+          ))
+        }
       </div>
 
       {/* Évolution + Comparaison régionale */}

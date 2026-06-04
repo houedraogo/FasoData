@@ -60,8 +60,8 @@ jobs:
             echo "📦 Rebuild de l'API (sans cache)..."
             docker compose -f infra/compose.prod.yml --env-file .env.production build --no-cache api
 
-            echo "🌐 Rebuild du Frontend..."
-            docker compose -f infra/compose.prod.yml --env-file .env.production build web
+            echo "🌐 Rebuild du Frontend (sans cache)..."
+            docker compose -f infra/compose.prod.yml --env-file .env.production build --no-cache web
 
             echo "🗄️ Migrations Alembic (upgrade head)..."
             docker compose -f infra/compose.prod.yml --env-file .env.production run --rm \

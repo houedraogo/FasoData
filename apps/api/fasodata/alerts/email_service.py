@@ -267,11 +267,18 @@ def _send(
         smtp_port = getattr(settings, "smtp_port", 587)
         context   = ssl.create_default_context()
 
-        with smtplib.SMTP(smtp_host, smtp_port) as server:
-            server.ehlo()
-            server.starttls(context=context)
-            server.login(smtp_user, smtp_pwd)
-            server.sendmail(from_addr, to_email, msg.as_bytes())
+        # Port 465 → SSL direct (SMTP_SSL)
+        # Port 587 → STARTTLS (SMTP standard)
+        if smtp_port == 465:
+            with smtplib.SMTP_SSL(smtp_host, smtp_port, context=context) as server:
+                server.login(smtp_user, smtp_pwd)
+                server.sendmail(from_addr, to_email, msg.as_bytes())
+        else:
+            with smtplib.SMTP(smtp_host, smtp_port) as server:
+                server.ehlo()
+                server.starttls(context=context)
+                server.login(smtp_user, smtp_pwd)
+                server.sendmail(from_addr, to_email, msg.as_bytes())
 
         logger.info(f"Email envoyé → {to_email} | {subject[:60]}")
         return True

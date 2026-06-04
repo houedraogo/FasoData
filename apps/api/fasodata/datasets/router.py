@@ -16,6 +16,7 @@ from fasodata.datasets.models import Dataset, DatasetLicense, DatasetStatus, Imp
 from fasodata.datasets.schemas import (
     DatasetCreate,
     DatasetListOut,
+    DatasetModerationRequest,
     DatasetOut,
     DatasetPreview,
     DatasetStats,
@@ -43,6 +44,11 @@ PRICE_DATASET_COLUMNS = [
     {"name": "validation_status", "type": "string", "description": "Statut de validation FasoData"},
     {"name": "notes", "type": "string", "description": "Notes techniques"},
 ]
+
+
+def _ensure_dataset_can_be_reviewed(dataset: Dataset) -> None:
+    if dataset.status not in (DatasetStatus.draft, DatasetStatus.pending):
+        raise HTTPException(409, detail="Ce dataset n'est pas en attente de validation")
 
 
 def make_unique_slug(base: str) -> str:
@@ -239,6 +245,67 @@ async def update_dataset(
     if data.status == DatasetStatus.published and not dataset.published_at:
         dataset.published_at = datetime.now(timezone.utc)
 
+    return dataset
+
+
+@router.post("/{slug}/submit", response_model=DatasetOut)
+async def submit_dataset_for_review(
+    slug: str,
+    data: DatasetModerationRequest | None = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_institutional),
+):
+    result = await db.execute(select(Dataset).where(Dataset.slug == slug))
+    dataset = result.scalar_one_or_none()
+    if not dataset:
+        raise HTTPException(404, detail="Dataset introuvable")
+    if current_user.role.value != "admin" and dataset.owner_id != current_user.id:
+        raise HTTPException(403, detail="Vous ne pouvez soumettre que vos propres datasets")
+    if dataset.status != DatasetStatus.draft:
+        raise HTTPException(409, detail="Seuls les brouillons peuvent etre soumis a validation")
+
+    dataset.status = DatasetStatus.pending
+    dataset.published_at = None
+    dataset.updated_at = datetime.now(timezone.utc)
+    return dataset
+
+
+@router.post("/{slug}/approve", response_model=DatasetOut)
+async def approve_dataset(
+    slug: str,
+    data: DatasetModerationRequest | None = None,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    result = await db.execute(select(Dataset).where(Dataset.slug == slug))
+    dataset = result.scalar_one_or_none()
+    if not dataset:
+        raise HTTPException(404, detail="Dataset introuvable")
+    _ensure_dataset_can_be_reviewed(dataset)
+
+    now = datetime.now(timezone.utc)
+    dataset.status = DatasetStatus.published
+    dataset.published_at = dataset.published_at or now
+    dataset.updated_at = now
+    return dataset
+
+
+@router.post("/{slug}/reject", response_model=DatasetOut)
+async def reject_dataset(
+    slug: str,
+    data: DatasetModerationRequest | None = None,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    result = await db.execute(select(Dataset).where(Dataset.slug == slug))
+    dataset = result.scalar_one_or_none()
+    if not dataset:
+        raise HTTPException(404, detail="Dataset introuvable")
+    _ensure_dataset_can_be_reviewed(dataset)
+
+    dataset.status = DatasetStatus.draft
+    dataset.published_at = None
+    dataset.updated_at = datetime.now(timezone.utc)
     return dataset
 
 

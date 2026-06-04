@@ -54,6 +54,11 @@ async def db_session(test_engine):
         yield session
         # Nettoyage dans l'ordre FK : enfants d'abord, parents ensuite
         await session.rollback()
+        await session.execute(text("DELETE FROM program_scenarios"))
+        await session.execute(text("DELETE FROM program_price_alerts"))
+        await session.execute(text("DELETE FROM programs"))
+        await session.execute(text("DELETE FROM dashboard_preferences"))
+        await session.execute(text("DELETE FROM alert_rules"))
         await session.execute(text("DELETE FROM import_jobs"))
         await session.execute(text("DELETE FROM price_data"))
         await session.execute(text("DELETE FROM alert_subscriptions"))

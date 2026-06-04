@@ -29,6 +29,10 @@ class DatasetUpdate(BaseModel):
     status: DatasetStatus | None = None
 
 
+class DatasetModerationRequest(BaseModel):
+    note: str | None = None
+
+
 class DatasetOut(DatasetBase):
     id: uuid.UUID
     slug: str

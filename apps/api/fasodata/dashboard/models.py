@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, Enum, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Enum, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -44,6 +44,26 @@ class QualityIssueSeverity(str, enum.Enum):
     medium = "medium"
     high = "high"
     critical = "critical"
+
+
+class ProgramStatus(str, enum.Enum):
+    active = "active"
+    paused = "paused"
+    archived = "archived"
+
+
+class DashboardPreference(Base):
+    __tablename__ = "dashboard_preferences"
+    __table_args__ = (UniqueConstraint("user_id", name="uq_dashboard_preferences_user_id"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    domains: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
+    data_types: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
+    regions: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
+    is_configured: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
 
 class AlertRule(Base):
@@ -126,4 +146,49 @@ class QualityIssue(Base):
     suggestion: Mapped[str | None] = mapped_column(Text)
     severity: Mapped[QualityIssueSeverity] = mapped_column(Enum(QualityIssueSeverity), default=QualityIssueSeverity.medium, nullable=False)
     is_resolved: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
+class Program(Base):
+    __tablename__ = "programs"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    sector: Mapped[str] = mapped_column(String(120), default="food_prices", nullable=False, index=True)
+    period: Mapped[str] = mapped_column(String(40), default="12m", nullable=False)
+    status: Mapped[ProgramStatus] = mapped_column(Enum(ProgramStatus), default=ProgramStatus.active, nullable=False)
+    owner_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    metadata_json: Mapped[dict | None] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+
+class ProgramPriceAlert(Base):
+    __tablename__ = "program_price_alerts"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    program_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("programs.id", ondelete="CASCADE"), index=True)
+    commodity: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    region: Mapped[str] = mapped_column(String(120), nullable=False, default="National", index=True)
+    threshold_price: Mapped[float] = mapped_column(Float, nullable=False)
+    current_price: Mapped[float | None] = mapped_column(Float)
+    is_triggered: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    channels: Mapped[list] = mapped_column(JSONB, default=list)
+    created_by_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+
+class ProgramScenario(Base):
+    __tablename__ = "program_scenarios"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    program_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("programs.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    region_a: Mapped[str] = mapped_column(String(120), nullable=False)
+    region_b: Mapped[str] = mapped_column(String(120), nullable=False)
+    commodity: Mapped[str] = mapped_column(String(80), default="maize", nullable=False)
+    parameters: Mapped[dict | None] = mapped_column(JSONB)
+    created_by_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))

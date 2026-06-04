@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, ReferenceLine,
@@ -12,6 +13,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { COMMODITIES, PRICE_EVOLUTION, REGIONS } from "@/lib/mockData";
+import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import toast from "react-hot-toast";
 
@@ -72,14 +74,55 @@ function Modal({
 
 // ── Types alertes ─────────────────────────────────────────────────────────────
 
-interface Alerte {
-  id: number; label: string; seuil: string; value: number; alert: boolean;
+interface Program {
+  id: string;
+  name: string;
+  sector: string;
+  period: string;
 }
+
+interface ProgramPriceAlert {
+  id: string;
+  commodity: string;
+  region: string;
+  threshold_price: number;
+  current_price: number | null;
+  is_triggered: boolean;
+}
+
+interface ProgramDetail extends Program {
+  alerts: ProgramPriceAlert[];
+}
+
+interface Alerte {
+  id: string | number; label: string; seuil: string; value: number; alert: boolean;
+}
+
+const PRODUCT_TO_KEY: Record<string, string> = {
+  "Maïs": "maize",
+  "MaÃ¯s": "maize",
+  "Mil": "millet",
+  "Sorgho": "sorghum",
+  "Riz local": "rice_local",
+  "Haricot": "cowpea",
+  "Niébé": "cowpea",
+  "NiÃ©bÃ©": "cowpea",
+};
+
+const KEY_TO_LABEL: Record<string, string> = {
+  maize: "Maïs",
+  millet: "Mil",
+  sorghum: "Sorgho",
+  rice_local: "Riz local",
+  cowpea: "Niébé",
+  groundnut: "Arachide",
+};
 
 // ── Page principale ───────────────────────────────────────────────────────────
 
 export default function ProgrammesPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   // Modals
   const [showCompare,   setShowCompare]   = useState(false);
@@ -94,8 +137,62 @@ export default function ProgrammesPage() {
     { id: 4, label: "Sorgho · Centre",      seuil: "> 320 CFA/kg", value: 305, alert: false },
   ]);
 
+  const { data: programs } = useQuery<Program[]>({
+    queryKey: ["programs", "food_prices"],
+    queryFn: async () => {
+      const { data } = await api.get("/dashboard/programs?sector=food_prices");
+      return data;
+    },
+  });
+
+  const activeProgram = programs?.[0];
+
+  const { data: programDetail, isLoading: alertsLoading } = useQuery<ProgramDetail>({
+    queryKey: ["program", activeProgram?.id],
+    queryFn: async () => {
+      const { data } = await api.get(`/dashboard/programs/${activeProgram!.id}`);
+      return data;
+    },
+    enabled: Boolean(activeProgram?.id),
+  });
+
+  const apiAlertes = useMemo<Alerte[]>(
+    () => (programDetail?.alerts ?? []).map((item) => ({
+      id: item.id,
+      label: `${KEY_TO_LABEL[item.commodity] ?? item.commodity} · ${item.region}`,
+      seuil: `> ${Math.round(item.threshold_price)} CFA/kg`,
+      value: Math.round(item.current_price ?? 0),
+      alert: item.is_triggered,
+    })),
+    [programDetail?.alerts]
+  );
+
+  const displayedAlertes = programDetail ? apiAlertes : alertes;
+  const criticalAlertCount = displayedAlertes.filter((item) => item.alert).length;
+
   // Formulaire nouvelle alerte
   const [newAlerte, setNewAlerte] = useState({ produit: "Maïs", region: "Sahel", seuil: "320" });
+
+  const createAlert = useMutation({
+    mutationFn: async () => {
+      if (!activeProgram?.id) throw new Error("Programme introuvable");
+      const commodity = PRODUCT_TO_KEY[newAlerte.produit] ?? newAlerte.produit;
+      const { data } = await api.post(`/dashboard/programs/${activeProgram.id}/alerts`, {
+        commodity,
+        region: newAlerte.region,
+        threshold_price: Number(newAlerte.seuil),
+        channels: ["dashboard", "email", "whatsapp"],
+      });
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["program", activeProgram?.id] });
+      setShowAddAlerte(false);
+      setNewAlerte({ produit: "Maïs", region: "Sahel", seuil: "320" });
+      toast.success("Alerte enregistree en base !");
+    },
+    onError: () => toast.error("Impossible d'enregistrer l'alerte"),
+  });
 
   // Filtre période
   const [activePeriod, setActivePeriod] = useState("12m");
@@ -124,12 +221,14 @@ export default function ProgrammesPage() {
       toast.error("Seuil invalide");
       return;
     }
+    createAlert.mutate();
+    return;
     const val = REGIONS.find((r) => r.name.toLowerCase().includes(newAlerte.region.toLowerCase()))?.prix_mais ?? 300;
     const seuil = Number(newAlerte.seuil);
     setAlertes((prev) => [
       ...prev,
       {
-        id:    Date.now(),
+        id:    String(Date.now()),
         label: `${newAlerte.produit} · ${newAlerte.region}`,
         seuil: `> ${seuil} CFA/kg`,
         value: val,
@@ -172,7 +271,7 @@ export default function ProgrammesPage() {
               <span key={chip} className="text-xs font-medium bg-[#1A2C42] text-white px-3 py-1.5 rounded-full">{chip}</span>
             ))}
             <span className="text-xs font-semibold text-[#E04E2F] bg-red-50 border border-red-100 px-3 py-1.5 rounded-full">
-              2 alertes critiques
+              {criticalAlertCount} alertes critiques
             </span>
           </div>
           <h1 className="text-2xl font-bold text-gray-900">Suivi des prix alimentaires</h1>
@@ -386,7 +485,7 @@ export default function ProgrammesPage() {
             <span className="text-xs text-gray-400">Configurables par produit</span>
           </div>
           <div className="space-y-3">
-            {alertes.map((item) => (
+            {(alertsLoading ? alertes : displayedAlertes).map((item) => (
               <div key={item.id}
                 className="flex items-center justify-between gap-3 py-2 border-b border-gray-50 last:border-0">
                 <div className="flex items-center gap-2">

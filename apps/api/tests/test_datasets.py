@@ -181,6 +181,73 @@ class TestUpdateDataset:
 
 
 @pytest.mark.asyncio
+class TestDatasetModerationWorkflow:
+    async def test_submit_then_admin_approve_publishes_dataset(self, client, institutional_token, admin_token):
+        create = await client.post(
+            "/api/datasets",
+            json={"name": "Workflow moderation dataset", "license": "open"},
+            headers={"Authorization": f"Bearer {institutional_token}"},
+        )
+        assert create.status_code == 201, create.text
+        slug = create.json()["slug"]
+        assert create.json()["status"] == "draft"
+
+        submit = await client.post(
+            f"/api/datasets/{slug}/submit",
+            headers={"Authorization": f"Bearer {institutional_token}"},
+        )
+        assert submit.status_code == 200, submit.text
+        assert submit.json()["status"] == "pending"
+
+        approve = await client.post(
+            f"/api/datasets/{slug}/approve",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert approve.status_code == 200, approve.text
+        assert approve.json()["status"] == "published"
+        assert approve.json()["published_at"] is not None
+
+    async def test_institutional_cannot_approve_dataset(self, client, institutional_token):
+        create = await client.post(
+            "/api/datasets",
+            json={"name": "Moderation forbidden approve", "license": "open"},
+            headers={"Authorization": f"Bearer {institutional_token}"},
+        )
+        slug = create.json()["slug"]
+        await client.post(
+            f"/api/datasets/{slug}/submit",
+            headers={"Authorization": f"Bearer {institutional_token}"},
+        )
+
+        approve = await client.post(
+            f"/api/datasets/{slug}/approve",
+            headers={"Authorization": f"Bearer {institutional_token}"},
+        )
+        assert approve.status_code == 403
+
+    async def test_admin_reject_returns_dataset_to_draft(self, client, institutional_token, admin_token):
+        create = await client.post(
+            "/api/datasets",
+            json={"name": "Moderation rejected dataset", "license": "open"},
+            headers={"Authorization": f"Bearer {institutional_token}"},
+        )
+        slug = create.json()["slug"]
+        await client.post(
+            f"/api/datasets/{slug}/submit",
+            headers={"Authorization": f"Bearer {institutional_token}"},
+        )
+
+        reject = await client.post(
+            f"/api/datasets/{slug}/reject",
+            json={"note": "Metadonnees incompletes"},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert reject.status_code == 200, reject.text
+        assert reject.json()["status"] == "draft"
+        assert reject.json()["published_at"] is None
+
+
+@pytest.mark.asyncio
 class TestDeleteDataset:
     async def test_delete_requires_admin(self, client, institutional_token):
         create = await client.post(

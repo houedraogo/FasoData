@@ -182,8 +182,8 @@ export default function PrixPage() {
       });
       const { data } = await api.get(`/prices/compare?${p}`);
       return data as {
-        commodity: string; label: string; granularity: string;
-        countries: Array<{ country: string; country_name: string; capital: string; color: string; points: { period: string; price: number }[] }>;
+        commodity: string; label: string; granularity: string; source: string; sources: string[];
+        countries: Array<{ country: string; country_name: string; capital: string; color: string; points: SeriesPoint[] }>;
       };
     },
     enabled: mode === "countries",
@@ -200,6 +200,14 @@ export default function PrixPage() {
       });
     });
     return Object.values(map).sort((a, b) => String(a.period).localeCompare(String(b.period)));
+  }, [countryCompare]);
+
+  const countrySeriesMap = useMemo(() => {
+    const m: Record<string, { points: SeriesPoint[] } | undefined> = {};
+    countryCompare?.countries.forEach((country) => {
+      m[country.country] = { points: country.points };
+    });
+    return m;
   }, [countryCompare]);
 
   const loading = mode === "commodities"
@@ -244,7 +252,7 @@ export default function PrixPage() {
     }
 
     return Object.values(map).sort((a, b) => String(a.period).localeCompare(String(b.period)));
-  }, [mode, commodityMap, regionMap, selectedKeys, selectedRegions]);
+  }, [mode, commodityMap, regionMap, countryMap, selectedKeys, selectedRegions]);
 
   // ── Lignes actives (pour les graphiques Recharts) ─────────────────────────
   const activeLines = mode === "commodities"
@@ -254,10 +262,17 @@ export default function PrixPage() {
     : activeCountries.map((c) => ({ key: c.key, label: `${c.flag} ${c.label}`, color: c.color }));
 
   // ── KPIs ──────────────────────────────────────────────────────────────────
-  const kpiItems = (mode === "commodities" ? activeCommodities.slice(0, 4) : activeRegions.slice(0, 4)).map((item) => {
+  const kpiItems = (mode === "commodities"
+    ? activeCommodities.slice(0, 4)
+    : mode === "regions"
+    ? activeRegions.slice(0, 4)
+    : activeCountries.slice(0, 4)
+  ).map((item) => {
     const series = mode === "commodities"
       ? commodityMap[item.key]
-      : regionMap[item.key];
+      : mode === "regions"
+      ? regionMap[item.key]
+      : countrySeriesMap[item.key];
     const last = series?.points.at(-1);
     const prev = series?.points.at(-2);
     return { ...item, current: last?.price ?? 0, previous: prev?.price ?? 0 };
@@ -265,7 +280,9 @@ export default function PrixPage() {
 
   // ── Variation annuelle sorgho (tableau onglet chart) ───────────────────────
   const annualData = useMemo(() => {
-    const targetSeries = mode === "commodities"
+    const targetSeries = mode === "countries"
+      ? countrySeriesMap[selectedCountries[0]]
+      : mode === "commodities"
       ? commodityMap["sorghum"]
       : regionMap[selectedRegions[0]];
     if (!targetSeries?.points.length) return [];
@@ -277,7 +294,7 @@ export default function PrixPage() {
     return Object.entries(yearly)
       .map(([yr, prices]) => ({ year: yr, value: Math.round(prices.reduce((a, b) => a + b, 0) / prices.length) }))
       .sort((a, b) => a.year.localeCompare(b.year));
-  }, [mode, commodityMap, regionMap, selectedRegions]);
+  }, [mode, commodityMap, regionMap, countrySeriesMap, selectedRegions, selectedCountries]);
 
   // ── Seuils du graphique ───────────────────────────────────────────────────
   const activeCommodityForSeuil = mode === "countries"
@@ -381,7 +398,7 @@ export default function PrixPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Évolution des prix alimentaires</h1>
           <p className="text-gray-500 text-sm mt-1">
-            Données WFP / SONAGESS · Burkina Faso · {titleLine}
+            {mode === "countries" ? "Données WFP · Sahel central" : "Données WFP / SONAGESS · Burkina Faso"} · {titleLine}
           </p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
@@ -578,7 +595,9 @@ export default function PrixPage() {
             <h2 className="font-bold text-gray-900">
               {mode === "commodities"
                 ? `Séries temporelles — ${region} — ${granularity === "monthly" ? "mensuel" : "annuel"}`
-                : `${COMMODITY_LABELS_FR[commodity] ?? commodity} — ${granularity === "monthly" ? "mensuel" : "annuel"} — ${activeRegions.length} régions`}
+                : mode === "regions"
+                ? `${COMMODITY_LABELS_FR[commodity] ?? commodity} — ${granularity === "monthly" ? "mensuel" : "annuel"} — ${activeRegions.length} régions`
+                : `${COMMODITY_LABELS_FR[commodityForCountries] ?? commodityForCountries} — comparaison inter-pays WFP — ${activeCountries.length} pays`}
             </h2>
           </div>
           <div className="flex items-center gap-1.5">
@@ -617,7 +636,9 @@ export default function PrixPage() {
               Seuil {s.value} CFA/kg
             </span>
           ))}
-          <span className="text-gray-300 ml-auto">Source : WFP VAM / SONAGESS</span>
+          <span className="text-gray-300 ml-auto">
+            Source : {mode === "countries" ? "WFP VAM Food Prices" : "WFP VAM / SONAGESS"}
+          </span>
         </div>
       </div>
 
@@ -642,7 +663,9 @@ export default function PrixPage() {
               <p className="text-xs text-gray-500 mb-4">
                 {mode === "commodities"
                   ? `Prix moyen annuel du Sorgho — ${region}`
-                  : `Prix moyen annuel du ${COMMODITY_LABELS_FR[commodity] ?? commodity} — ${activeRegions.map((r) => r.label).join(", ")}`}
+                  : mode === "regions"
+                  ? `Prix moyen annuel du ${COMMODITY_LABELS_FR[commodity] ?? commodity} — ${activeRegions.map((r) => r.label).join(", ")}`
+                  : `Prix moyen annuel du ${COMMODITY_LABELS_FR[commodityForCountries] ?? commodityForCountries} — ${activeCountries.map((c) => c.label).join(", ")}`}
               </p>
               {loading ? (
                 <div className="h-56 bg-gray-50 rounded-xl animate-pulse" />
@@ -653,7 +676,13 @@ export default function PrixPage() {
                     <XAxis dataKey="year" tick={{ fontSize: 11, fill: "#94A3B8" }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fontSize: 11, fill: "#94A3B8" }} axisLine={false} tickLine={false} />
                     <Tooltip formatter={(v: number) => [`${v} CFA/kg`, "Prix moyen"]} contentStyle={{ borderRadius: 8 }} />
-                    <Bar dataKey="value" fill={mode === "commodities" ? "#E04E2F" : activeRegions[0]?.color ?? "#1A2C42"}
+                    <Bar dataKey="value" fill={
+                      mode === "commodities"
+                        ? "#E04E2F"
+                        : mode === "countries"
+                        ? activeCountries[0]?.color ?? "#1A2C42"
+                        : activeRegions[0]?.color ?? "#1A2C42"
+                    }
                       radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>

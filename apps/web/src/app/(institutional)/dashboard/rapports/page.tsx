@@ -53,6 +53,7 @@ export default function RapportsPage() {
   const [selectedId, setSelectedId]     = useState("");
   const [selectedName, setSelectedName] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isPdfGenerating, setIsPdfGenerating] = useState(false);
   const [jobs, setJobs]                 = useState<ExportJob[]>([]);
 
   // Polling refs pour les tâches en cours
@@ -133,6 +134,27 @@ export default function RapportsPage() {
     }
   };
 
+  const handleGeneratePdf = async () => {
+    if (!selectedId) { toast.error("Sélectionnez un dataset"); return; }
+    setIsPdfGenerating(true);
+    try {
+      const response = await api.post(`/reports/${selectedId}/export/pdf`, {}, { responseType: "blob" });
+      const blob = new Blob([response.data], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const safeName = (selectedName || "dataset").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      a.href = url;
+      a.download = `rapport-${safeName || "dataset"}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Rapport PDF généré");
+    } catch {
+      toast.error("Impossible de générer le PDF");
+    } finally {
+      setIsPdfGenerating(false);
+    }
+  };
+
   return (
     <div className="p-6 lg:p-8 max-w-4xl space-y-6">
 
@@ -140,7 +162,7 @@ export default function RapportsPage() {
       <div>
         <h1 className="text-2xl font-bold text-faso-navy">Rapports & Exports</h1>
         <p className="text-gray-500 text-sm mt-1">
-          Générez des exports CSV filtrés de vos datasets publiés.
+          Générez des rapports PDF et des exports CSV depuis vos datasets publiés.
         </p>
       </div>
 
@@ -153,7 +175,7 @@ export default function RapportsPage() {
           <h2 className="font-bold text-gray-900">Nouvel export</h2>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
           {/* Sélecteur dataset */}
           <div className="sm:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -193,6 +215,18 @@ export default function RapportsPage() {
               <><FileDown className="w-4 h-4" /> Exporter CSV</>
             )}
           </button>
+
+          <button
+            onClick={handleGeneratePdf}
+            disabled={!selectedId || isPdfGenerating}
+            className="btn-secondary justify-center py-2.5 disabled:opacity-50"
+          >
+            {isPdfGenerating ? (
+              <><Loader2 className="w-4 h-4 animate-spin" /> PDF…</>
+            ) : (
+              <><FileText className="w-4 h-4" /> Rapport PDF</>
+            )}
+          </button>
         </div>
 
         {selectedId && (() => {
@@ -203,7 +237,7 @@ export default function RapportsPage() {
               <span>
                 <strong>{ds.name}</strong> — format {ds.file_format?.toUpperCase() ?? "CSV"}
                 {ds.row_count != null && `, ${ds.row_count.toLocaleString("fr-FR")} lignes`}.
-                L'export contiendra toutes les données sans filtre.
+                Le PDF reprend les métadonnées, statistiques et aperçus disponibles. Le CSV contiendra toutes les données sans filtre.
               </span>
             </div>
           ) : null;

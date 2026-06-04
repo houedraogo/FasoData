@@ -74,6 +74,15 @@ export default function MesDatasetsPage() {
     onError: () => toast.error("Erreur lors de la suppression"),
   });
 
+  const submitDs = useMutation({
+    mutationFn: (slug: string) => api.post(`/datasets/${slug}/submit`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["my-datasets-list"] });
+      toast.success("Dataset soumis à validation");
+    },
+    onError: () => toast.error("Impossible de soumettre ce dataset"),
+  });
+
   const handleTab = (t: Status | "all") => { setTab(t); setPage(1); };
   const handleSearch = (v: string)       => { setSearch(v); setPage(1); };
 
@@ -202,6 +211,16 @@ export default function MesDatasetsPage() {
 
                   {/* Actions */}
                   <div className="flex items-center gap-1.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {ds.status === "draft" && (
+                      <button
+                        onClick={() => submitDs.mutate(ds.slug)}
+                        className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-yellow-700 bg-yellow-50 hover:bg-yellow-100 rounded-lg transition-colors"
+                        title="Soumettre à validation"
+                      >
+                        <Clock className="w-3.5 h-3.5" />
+                        Soumettre
+                      </button>
+                    )}
                     {ds.status === "published" && (
                       <Link
                         href={`/datasets/${ds.slug}`}

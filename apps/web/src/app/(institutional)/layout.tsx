@@ -55,7 +55,10 @@ export default function InstitutionalLayout({ children }: { children: React.Reac
   const pageLabel = useBreadcrumb(pathname);
 
   const orgName    = user?.organization ?? "Mon Organisation";
-  const userName   = user?.full_name ?? user?.email ?? "Utilisateur";
+  const rawUserName = user?.full_name ?? user?.email ?? "Utilisateur";
+  const userName   = rawUserName.toLowerCase().includes("démo") || rawUserName.toLowerCase().includes("demo")
+    ? "Utilisateur"
+    : rawUserName;
   const userRole   = user?.role === "admin" ? "Administrateur" : user?.role === "institutional" ? "Contributeur" : "Lecteur";
   const initials   = userName.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
 

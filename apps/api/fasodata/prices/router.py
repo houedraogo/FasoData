@@ -753,6 +753,7 @@ async def compare_countries(
     granularity: str = Query("monthly", pattern="^(monthly|yearly)$"),
     start:       str | None = Query(None, description="YYYY-MM"),
     end:         str | None = Query(None, description="YYYY-MM"),
+    sources:     str | None = Query("wfp", description="Sources separees par virgule, wfp par defaut"),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -763,14 +764,22 @@ async def compare_countries(
     """
     commodity = COMMODITY_ALIASES.get(commodity.lower(), commodity)
     country_list = [c.strip().upper() for c in countries.split(",") if c.strip()]
+    selected_sources = _parse_series_sources(sources)
 
     series_by_country: dict[str, list[SeriesPoint]] = {}
 
     for country_code in country_list:
         q = select(PriceData).where(
             PriceData.commodity == commodity,
-            PriceData.region    == "National",
             PriceData.country   == country_code,
+            PriceData.source.in_(selected_sources),
+            or_(
+                PriceData.validation_status.in_(SERIES_VALID_STATUSES),
+                and_(
+                    PriceData.source == "aggregated",
+                    PriceData.validation_status == "aggregated",
+                ),
+            ),
         )
         if start:
             q = q.where(PriceData.price_date >= date.fromisoformat(start + "-01"))
@@ -786,21 +795,30 @@ async def compare_countries(
         rows   = result.scalars().all()
 
         # Agréger par période
-        buckets: dict[str, list[float]] = {}
+        buckets: dict[str, dict] = {}
         for row in rows:
             if granularity == "monthly":
                 key = f"{row.price_date.year:04d}-{row.price_date.month:02d}"
             else:
                 key = str(row.price_date.year)
-            buckets.setdefault(key, []).append(row.price)
+            weight = max(1, int(row.n_obs or 1))
+            bucket = buckets.setdefault(
+                key,
+                {"weighted_sum": 0.0, "weight": 0, "prices": [], "sources": {}},
+            )
+            bucket["weighted_sum"] += row.price * weight
+            bucket["weight"] += weight
+            bucket["prices"].append(row.price)
+            bucket["sources"][row.source] = bucket["sources"].get(row.source, 0) + weight
 
         series_by_country[country_code] = [
             SeriesPoint(
                 period=k,
-                price=round(sum(v) / len(v), 1),
-                min=round(min(v), 1),
-                max=round(max(v), 1),
-                n_obs=len(v),
+                price=round(v["weighted_sum"] / v["weight"], 1),
+                min=round(min(v["prices"]), 1),
+                max=round(max(v["prices"]), 1),
+                n_obs=v["weight"],
+                sources=v["sources"],
             )
             for k, v in sorted(buckets.items())
         ]
@@ -818,6 +836,8 @@ async def compare_countries(
             "label":       COMMODITY_LABELS.get(commodity, commodity),
             "granularity": granularity,
             "unit":        "CFA/kg",
+            "source":      "+".join(selected_sources),
+            "sources":     selected_sources,
             "points":      series_by_country.get(country_code, []),
         })
 
@@ -825,5 +845,7 @@ async def compare_countries(
         "commodity":   commodity,
         "label":       COMMODITY_LABELS.get(commodity, commodity),
         "granularity": granularity,
+        "source":      "+".join(selected_sources),
+        "sources":     selected_sources,
         "countries":   result_series,
     }

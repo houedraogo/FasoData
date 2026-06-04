@@ -1,22 +1,49 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from fasodata.auth.deps import get_current_active_user, require_admin, require_institutional
 from fasodata.core.database import get_db
-from fasodata.dashboard.models import AlertRule, QualityCheck, QualityCheckStatus, QualityIssue, SystemMetric, TeamMember
+from fasodata.dashboard.models import (
+    AlertRule,
+    DashboardPreference,
+    Program,
+    ProgramPriceAlert,
+    ProgramScenario,
+    ProgramStatus,
+    QualityCheck,
+    QualityCheckStatus,
+    QualityIssue,
+    SystemMetric,
+    TeamMember,
+)
 from fasodata.dashboard.schemas import (
     AlertRuleCreate,
     AlertRuleOut,
     AlertRuleUpdate,
+    DashboardOverviewOut,
+    DashboardPreferenceOut,
+    DashboardPreferenceUpdate,
+    DashboardRegionSummaryOut,
+    DashboardRecommendationOut,
     QualityCheckCreate,
     QualityCheckOut,
     QualityCheckUpdate,
     QualityIssueCorrection,
     QualityIssueOut,
+    ProgramCreate,
+    ProgramDetailOut,
+    ProgramOut,
+    ProgramPriceAlertCreate,
+    ProgramPriceAlertOut,
+    ProgramPriceAlertUpdate,
+    ProgramScenarioCreate,
+    ProgramScenarioOut,
+    ProgramScenarioUpdate,
+    ProgramUpdate,
     SystemMetricCreate,
     SystemMetricOut,
     TeamMemberCreate,
@@ -24,9 +51,16 @@ from fasodata.dashboard.schemas import (
     TeamMemberUpdate,
 )
 from fasodata.datasets.models import Dataset, DatasetStatus
+from fasodata.prices.models import PriceData
 from fasodata.users.models import User
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
+
+DEFAULT_DASHBOARD_PREFERENCES = {
+    "domains": ["prices"],
+    "data_types": ["time_series", "maps"],
+    "regions": ["National"],
+}
 
 
 async def _quality_check_out(db: AsyncSession, check: QualityCheck) -> QualityCheckOut:
@@ -39,6 +73,60 @@ async def _quality_check_out(db: AsyncSession, check: QualityCheck) -> QualityCh
     data = QualityCheckOut.model_validate(check).model_dump()
     data["issues"] = [QualityIssueOut.model_validate(issue) for issue in issues]
     return QualityCheckOut(**data)
+
+
+async def _program_detail_out(db: AsyncSession, program: Program) -> ProgramDetailOut:
+    alerts_result = await db.execute(
+        select(ProgramPriceAlert)
+        .where(ProgramPriceAlert.program_id == program.id)
+        .order_by(ProgramPriceAlert.created_at.desc())
+    )
+    scenarios_result = await db.execute(
+        select(ProgramScenario)
+        .where(ProgramScenario.program_id == program.id)
+        .order_by(ProgramScenario.created_at.desc())
+    )
+    data = ProgramOut.model_validate(program).model_dump()
+    data["alerts"] = [ProgramPriceAlertOut.model_validate(item) for item in alerts_result.scalars().all()]
+    data["scenarios"] = [ProgramScenarioOut.model_validate(item) for item in scenarios_result.scalars().all()]
+    return ProgramDetailOut(**data)
+
+
+async def _get_or_create_dashboard_preferences(db: AsyncSession, user: User) -> DashboardPreference:
+    result = await db.execute(
+        select(DashboardPreference).where(DashboardPreference.user_id == user.id)
+    )
+    preference = result.scalar_one_or_none()
+    if preference:
+        return preference
+
+    preference = DashboardPreference(user_id=user.id, **DEFAULT_DASHBOARD_PREFERENCES)
+    db.add(preference)
+    await db.flush()
+    return preference
+
+
+async def _ensure_default_food_program(db: AsyncSession, user: User | None = None) -> Program:
+    result = await db.execute(
+        select(Program).where(
+            Program.sector == "food_prices",
+            Program.name == "Suivi des prix alimentaires",
+        )
+    )
+    program = result.scalar_one_or_none()
+    if program:
+        return program
+    program = Program(
+        name="Suivi des prix alimentaires",
+        description="Suivi des prix des cereales et produits alimentaires strategiques.",
+        sector="food_prices",
+        period="12m",
+        owner_id=user.id if user else None,
+        metadata_json={"default": True},
+    )
+    db.add(program)
+    await db.flush()
+    return program
 
 
 REGIONS = [
@@ -56,6 +144,675 @@ REGIONS = [
     {"name": "Sud-Ouest", "chef": "Diebougou", "beneficiaires": 389, "prix_mais": 278, "indicateur": 62, "objectif": 72},
     {"name": "Cascades", "chef": "Banfora", "beneficiaires": 445, "prix_mais": 270, "indicateur": 84, "objectif": 88},
 ]
+
+
+def _percent_change(current: int | float, previous: int | float) -> float:
+    if previous == 0:
+        return 100.0 if current else 0.0
+    return round(((current - previous) / previous) * 100, 1)
+
+
+def _bucket_counts(dates: list[date | datetime], today: date) -> list[int]:
+    start = today - timedelta(days=55)
+    buckets = [0] * 8
+    for value in dates:
+        current = value.date() if isinstance(value, datetime) else value
+        if current < start or current > today:
+            continue
+        index = min(7, max(0, (current - start).days // 7))
+        buckets[index] += 1
+    return buckets
+
+
+def _preference_regions(preference: DashboardPreference) -> list[str]:
+    return [region for region in (preference.regions or []) if region != "National"]
+
+
+def _preference_program_sectors(preference: DashboardPreference) -> list[str]:
+    mapping = {
+        "prices": "food_prices",
+        "health": "health",
+        "education": "education",
+        "water": "water",
+        "territory": "territory",
+    }
+    return [mapping[domain] for domain in (preference.domains or []) if domain in mapping]
+
+
+def _preference_dataset_filter(preference: DashboardPreference):
+    clauses = [
+        _dataset_match_filter(DOMAIN_KEYWORDS[domain])
+        for domain in (preference.domains or [])
+        if domain in DOMAIN_KEYWORDS
+    ]
+    return or_(*clauses) if clauses else None
+
+
+@router.get("/overview", response_model=DashboardOverviewOut)
+async def dashboard_overview(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    await _ensure_default_food_program(db, current_user)
+    preference = await _get_or_create_dashboard_preferences(db, current_user)
+    selected_regions = _preference_regions(preference)
+    program_sectors = _preference_program_sectors(preference)
+    dataset_filter = _preference_dataset_filter(preference)
+
+    today = date.today()
+    current_start = today - timedelta(days=30)
+    previous_start = today - timedelta(days=60)
+    spark_start = today - timedelta(days=55)
+
+    async def count(query):
+        result = await db.execute(query)
+        return int(result.scalar_one() or 0)
+
+    program_filters = [
+        Program.status == ProgramStatus.active,
+        Program.owner_id == current_user.id,
+    ]
+    if program_sectors:
+        program_filters.append(Program.sector.in_(program_sectors))
+
+    active_programs = await count(
+        select(func.count(Program.id)).where(*program_filters)
+    )
+    current_programs = await count(
+        select(func.count(Program.id)).where(
+            *program_filters,
+            Program.created_at >= datetime.combine(current_start, datetime.min.time(), tzinfo=timezone.utc),
+        )
+    )
+    previous_programs = await count(
+        select(func.count(Program.id)).where(
+            *program_filters,
+            Program.created_at >= datetime.combine(previous_start, datetime.min.time(), tzinfo=timezone.utc),
+            Program.created_at < datetime.combine(current_start, datetime.min.time(), tzinfo=timezone.utc),
+        )
+    )
+
+    price_filters = [PriceData.country == "BFA"]
+    if "prices" not in (preference.domains or []):
+        price_filters.append(PriceData.id.is_(None))
+    if selected_regions:
+        price_filters.append(PriceData.region.in_(selected_regions))
+
+    price_total = await count(select(func.count(PriceData.id)).where(*price_filters))
+    price_current = await count(
+        select(func.count(PriceData.id)).where(*price_filters, PriceData.price_date >= current_start)
+    )
+    price_previous = await count(
+        select(func.count(PriceData.id)).where(
+            *price_filters,
+            PriceData.price_date >= previous_start,
+            PriceData.price_date < current_start,
+        )
+    )
+
+    dataset_filters = [Dataset.status == DatasetStatus.published]
+    if dataset_filter is not None:
+        dataset_filters.append(dataset_filter)
+
+    datasets_total = await count(
+        select(func.count(Dataset.id)).where(*dataset_filters)
+    )
+    datasets_current = await count(
+        select(func.count(Dataset.id)).where(
+            *dataset_filters,
+            Dataset.published_at >= datetime.combine(current_start, datetime.min.time(), tzinfo=timezone.utc),
+        )
+    )
+    datasets_previous = await count(
+        select(func.count(Dataset.id)).where(
+            *dataset_filters,
+            Dataset.published_at >= datetime.combine(previous_start, datetime.min.time(), tzinfo=timezone.utc),
+            Dataset.published_at < datetime.combine(current_start, datetime.min.time(), tzinfo=timezone.utc),
+        )
+    )
+
+    alert_filters = [
+        ProgramPriceAlert.is_triggered.is_(True),
+        ProgramPriceAlert.created_by_id == current_user.id,
+    ]
+    if selected_regions:
+        alert_filters.append(ProgramPriceAlert.region.in_(selected_regions))
+
+    triggered_alerts = await count(
+        select(func.count(ProgramPriceAlert.id)).where(*alert_filters)
+    )
+    alerts_current = await count(
+        select(func.count(ProgramPriceAlert.id)).where(
+            *alert_filters,
+            ProgramPriceAlert.created_at >= datetime.combine(current_start, datetime.min.time(), tzinfo=timezone.utc),
+        )
+    )
+    alerts_previous = await count(
+        select(func.count(ProgramPriceAlert.id)).where(
+            *alert_filters,
+            ProgramPriceAlert.created_at >= datetime.combine(previous_start, datetime.min.time(), tzinfo=timezone.utc),
+            ProgramPriceAlert.created_at < datetime.combine(current_start, datetime.min.time(), tzinfo=timezone.utc),
+        )
+    )
+
+    price_dates_result = await db.execute(
+        select(PriceData.price_date).where(*price_filters, PriceData.price_date >= spark_start)
+    )
+    program_dates_result = await db.execute(
+        select(Program.created_at).where(
+            *program_filters,
+            Program.created_at >= datetime.combine(spark_start, datetime.min.time(), tzinfo=timezone.utc),
+        )
+    )
+    dataset_dates_result = await db.execute(
+        select(Dataset.published_at).where(
+            *dataset_filters,
+            Dataset.published_at.is_not(None),
+            Dataset.published_at >= datetime.combine(spark_start, datetime.min.time(), tzinfo=timezone.utc),
+        )
+    )
+    alert_dates_result = await db.execute(
+        select(ProgramPriceAlert.created_at).where(
+            *alert_filters,
+            ProgramPriceAlert.created_at >= datetime.combine(spark_start, datetime.min.time(), tzinfo=timezone.utc),
+        )
+    )
+
+    return DashboardOverviewOut(
+        updated_at=datetime.now(timezone.utc),
+        period="30 derniers jours",
+        kpis=[
+            {
+                "key": "programs",
+                "label": "Programmes actifs",
+                "value": active_programs,
+                "sub": "programmes suivis",
+                "change": _percent_change(current_programs, previous_programs),
+                "spark": _bucket_counts(program_dates_result.scalars().all(), today),
+            },
+            {
+                "key": "price_observations",
+                "label": "Observations prix",
+                "value": price_total,
+                "sub": f"{price_current} nouvelles",
+                "change": _percent_change(price_current, price_previous),
+                "spark": _bucket_counts(price_dates_result.scalars().all(), today),
+            },
+            {
+                "key": "datasets",
+                "label": "Datasets publiés",
+                "value": datasets_total,
+                "sub": "catalogue public",
+                "change": _percent_change(datasets_current, datasets_previous),
+                "spark": _bucket_counts(dataset_dates_result.scalars().all(), today),
+            },
+            {
+                "key": "alerts",
+                "label": "Alertes déclenchées",
+                "value": triggered_alerts,
+                "sub": "seuils actifs",
+                "change": _percent_change(alerts_current, alerts_previous),
+                "spark": _bucket_counts(alert_dates_result.scalars().all(), today),
+            },
+        ],
+    )
+
+
+@router.get("/preferences", response_model=DashboardPreferenceOut)
+async def get_dashboard_preferences(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    return await _get_or_create_dashboard_preferences(db, current_user)
+
+
+@router.put("/preferences", response_model=DashboardPreferenceOut)
+async def upsert_dashboard_preferences(
+    data: DashboardPreferenceUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    if not data.domains:
+        raise HTTPException(422, detail="Choisissez au moins un domaine de suivi")
+    if not data.data_types:
+        raise HTTPException(422, detail="Choisissez au moins un type de donnees")
+
+    result = await db.execute(
+        select(DashboardPreference).where(DashboardPreference.user_id == current_user.id)
+    )
+    preference = result.scalar_one_or_none()
+    values = {
+        "domains": data.domains,
+        "data_types": data.data_types,
+        "regions": data.regions or ["National"],
+    }
+    if preference:
+        for field, value in values.items():
+            setattr(preference, field, value)
+        preference.is_configured = True
+    else:
+        preference = DashboardPreference(user_id=current_user.id, is_configured=True, **values)
+        db.add(preference)
+    await db.flush()
+    return preference
+
+
+DOMAIN_KEYWORDS = {
+    "prices": ["prix", "cereales", "céréales", "agriculture", "marches", "marchés", "wfp"],
+    "health": ["sante", "santé", "vaccination", "nutrition"],
+    "education": ["education", "éducation", "ecole", "école", "enseign"],
+    "water": ["eau", "assainissement", "forage", "hydraulique"],
+    "territory": ["carte", "geo", "géographie", "region", "région", "territoire"],
+}
+
+DOMAIN_LABELS = {
+    "prices": "Prix alimentaires",
+    "health": "Santé",
+    "education": "Éducation",
+    "water": "Eau & assainissement",
+    "territory": "Territoires",
+}
+
+
+def _dataset_match_filter(keywords: list[str]):
+    clauses = []
+    for keyword in keywords:
+        pattern = f"%{keyword}%"
+        clauses.extend([
+            Dataset.name.ilike(pattern),
+            Dataset.description.ilike(pattern),
+            Dataset.category.ilike(pattern),
+            Dataset.source.ilike(pattern),
+        ])
+    return or_(*clauses)
+
+
+@router.get("/recommendations", response_model=list[DashboardRecommendationOut])
+async def dashboard_recommendations(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    preference = await _get_or_create_dashboard_preferences(db, current_user)
+    domains = preference.domains or DEFAULT_DASHBOARD_PREFERENCES["domains"]
+    data_types = preference.data_types or DEFAULT_DASHBOARD_PREFERENCES["data_types"]
+    regions = preference.regions or DEFAULT_DASHBOARD_PREFERENCES["regions"]
+    selected_regions = [region for region in regions if region != "National"]
+
+    recommendations: list[dict] = []
+
+    if "prices" in domains:
+        price_filters = [PriceData.country == "BFA"]
+        if selected_regions:
+            price_filters.append(PriceData.region.in_(selected_regions))
+        latest_result = await db.execute(
+            select(
+                func.max(PriceData.price_date),
+                func.count(PriceData.id),
+                func.count(func.distinct(PriceData.market)),
+                func.count(func.distinct(PriceData.region)),
+            )
+            .where(*price_filters)
+        )
+        latest_date, observations, markets, price_regions = latest_result.one()
+        coverage_detail = f"{int(markets or 0)} marchés" if markets else f"{int(price_regions or 0)} régions"
+        recommendations.append({
+            "key": "prices-wfp",
+            "title": "Suivi des prix alimentaires",
+            "text": "Dernières observations WFP/SMS filtrées selon vos régions de veille.",
+            "href": "/dashboard/prix",
+            "kind": "prices",
+            "source": "WFP + FasoData SMS",
+            "metric": f"{int(observations or 0):,}".replace(",", " ") + " observations",
+            "detail": coverage_detail + (f" · dernière donnée {latest_date.isoformat()}" if latest_date else ""),
+            "icon": "wheat",
+        })
+
+    if "alerts" in data_types:
+        rule_count = await db.scalar(
+            select(func.count(AlertRule.id)).where(AlertRule.created_by_id == current_user.id)
+        )
+        triggered_count = await db.scalar(
+            select(func.count(ProgramPriceAlert.id)).where(
+                ProgramPriceAlert.created_by_id == current_user.id,
+                ProgramPriceAlert.is_triggered.is_(True),
+            )
+        )
+        recommendations.append({
+            "key": "alerts-rules",
+            "title": "Alertes à configurer",
+            "text": "Surveillez automatiquement les seuils qui comptent pour vos domaines.",
+            "href": "/dashboard/alertes",
+            "kind": "alerts",
+            "source": "Règles FasoData",
+            "metric": f"{int(rule_count or 0)} règles",
+            "detail": f"{int(triggered_count or 0)} alertes déclenchées",
+            "icon": "bell",
+        })
+
+    if "maps" in data_types or "territory" in domains:
+        geo_count = await db.scalar(
+            select(func.count(Dataset.id)).where(
+                Dataset.status == DatasetStatus.published,
+                Dataset.is_geo.is_(True),
+            )
+        )
+        price_region_count = await db.scalar(
+            select(func.count(func.distinct(PriceData.region))).where(PriceData.country == "BFA")
+        )
+        recommendations.append({
+            "key": "map-layers",
+            "title": "Carte interactive",
+            "text": "Calques géographiques et indicateurs régionaux disponibles pour votre veille.",
+            "href": "/carte",
+            "kind": "map",
+            "source": "Catalogue + prix régionaux",
+            "metric": f"{int(price_region_count or 0)} régions prix",
+            "detail": f"{int(geo_count or 0)} datasets géographiques publiés",
+            "icon": "map",
+        })
+
+    if "datasets" in data_types:
+        for domain in domains:
+            keywords = DOMAIN_KEYWORDS.get(domain, [])
+            if not keywords:
+                continue
+            query = select(Dataset).where(
+                Dataset.status == DatasetStatus.published,
+                _dataset_match_filter(keywords),
+            )
+            if domain == "prices":
+                query = query.order_by(
+                    (Dataset.slug == "prix-alimentaires-burkina-faso").desc(),
+                    Dataset.updated_at.desc(),
+                )
+            else:
+                query = query.order_by(Dataset.updated_at.desc())
+            query = query.limit(1)
+            result = await db.execute(query)
+            dataset = result.scalar_one_or_none()
+            total = await db.scalar(
+                select(func.count(Dataset.id)).where(
+                    Dataset.status == DatasetStatus.published,
+                    _dataset_match_filter(keywords),
+                )
+            )
+            label = DOMAIN_LABELS.get(domain, domain)
+            recommendations.append({
+                "key": f"datasets-{domain}",
+                "title": f"Datasets {label.lower()}",
+                "text": dataset.description[:110] if dataset and dataset.description else f"Jeux de données publiés liés à {label.lower()}.",
+                "href": f"/datasets/{dataset.slug}" if dataset else f"/datasets?category={label}",
+                "kind": "dataset",
+                "source": dataset.source if dataset and dataset.source else "Catalogue FasoData",
+                "metric": f"{int(total or 0)} datasets",
+                "detail": dataset.name if dataset else "Catalogue public",
+                "icon": "database",
+            })
+
+    if not recommendations:
+        recommendations.append({
+            "key": "catalog",
+            "title": "Catalogue public",
+            "text": "Explorez les datasets publiés et affinez vos préférences de veille.",
+            "href": "/datasets",
+            "kind": "dataset",
+            "source": "Catalogue FasoData",
+            "metric": None,
+            "detail": None,
+            "icon": "database",
+        })
+
+    return recommendations[:6]
+
+
+@router.get("/regions/summary", response_model=list[DashboardRegionSummaryOut])
+async def dashboard_region_summary(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    preference = await _get_or_create_dashboard_preferences(db, current_user)
+    selected_regions = _preference_regions(preference)
+
+    query = (
+        select(
+            PriceData.region,
+            func.count(PriceData.id).label("observations"),
+            func.avg(PriceData.price).label("avg_price"),
+            func.max(PriceData.price_date).label("latest_date"),
+        )
+        .where(PriceData.country == "BFA")
+        .group_by(PriceData.region)
+        .order_by(func.count(PriceData.id).desc())
+    )
+    if selected_regions:
+        query = query.where(PriceData.region.in_(selected_regions))
+
+    result = await db.execute(query.limit(12))
+    return [
+        {
+            "region": row.region or "National",
+            "observations": int(row.observations or 0),
+            "avg_price": round(float(row.avg_price or 0), 1),
+            "latest_date": row.latest_date,
+        }
+        for row in result.all()
+    ]
+
+
+@router.get("/programs", response_model=list[ProgramOut])
+async def list_programs(
+    sector: str | None = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    await _ensure_default_food_program(db, current_user)
+    query = select(Program)
+    if sector:
+        query = query.where(Program.sector == sector)
+    result = await db.execute(query.order_by(Program.created_at.desc()))
+    return result.scalars().all()
+
+
+@router.post("/programs", response_model=ProgramOut, status_code=201)
+async def create_program(
+    data: ProgramCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_institutional),
+):
+    program = Program(**data.model_dump(), owner_id=current_user.id)
+    db.add(program)
+    await db.flush()
+    return program
+
+
+@router.get("/programs/{program_id}", response_model=ProgramDetailOut)
+async def get_program(
+    program_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_active_user),
+):
+    result = await db.execute(select(Program).where(Program.id == program_id))
+    program = result.scalar_one_or_none()
+    if not program:
+        raise HTTPException(404, detail="Programme introuvable")
+    return await _program_detail_out(db, program)
+
+
+@router.patch("/programs/{program_id}", response_model=ProgramOut)
+async def update_program(
+    program_id: uuid.UUID,
+    data: ProgramUpdate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_institutional),
+):
+    result = await db.execute(select(Program).where(Program.id == program_id))
+    program = result.scalar_one_or_none()
+    if not program:
+        raise HTTPException(404, detail="Programme introuvable")
+    for field, value in data.model_dump(exclude_none=True).items():
+        setattr(program, field, value)
+    return program
+
+
+@router.delete("/programs/{program_id}", status_code=204)
+async def delete_program(
+    program_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_institutional),
+):
+    result = await db.execute(select(Program).where(Program.id == program_id))
+    program = result.scalar_one_or_none()
+    if not program:
+        raise HTTPException(404, detail="Programme introuvable")
+    await db.delete(program)
+
+
+@router.get("/programs/{program_id}/alerts", response_model=list[ProgramPriceAlertOut])
+async def list_program_alerts(
+    program_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_active_user),
+):
+    result = await db.execute(
+        select(ProgramPriceAlert)
+        .where(ProgramPriceAlert.program_id == program_id)
+        .order_by(ProgramPriceAlert.created_at.desc())
+    )
+    return result.scalars().all()
+
+
+@router.post("/programs/{program_id}/alerts", response_model=ProgramPriceAlertOut, status_code=201)
+async def create_program_alert(
+    program_id: uuid.UUID,
+    data: ProgramPriceAlertCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_institutional),
+):
+    program_result = await db.execute(select(Program).where(Program.id == program_id))
+    if not program_result.scalar_one_or_none():
+        raise HTTPException(404, detail="Programme introuvable")
+    current_price = data.current_price
+    if current_price is None:
+        from fasodata.prices.models import PriceData
+
+        price_result = await db.execute(
+            select(PriceData)
+            .where(PriceData.commodity == data.commodity, PriceData.region == data.region)
+            .order_by(PriceData.price_date.desc(), PriceData.created_at.desc())
+            .limit(1)
+        )
+        latest = price_result.scalar_one_or_none()
+        current_price = latest.price if latest else None
+    alert = ProgramPriceAlert(
+        **data.model_dump(exclude={"current_price"}),
+        program_id=program_id,
+        current_price=current_price,
+        is_triggered=bool(current_price is not None and current_price > data.threshold_price),
+        created_by_id=current_user.id,
+    )
+    db.add(alert)
+    await db.flush()
+    return alert
+
+
+@router.patch("/programs/{program_id}/alerts/{alert_id}", response_model=ProgramPriceAlertOut)
+async def update_program_alert(
+    program_id: uuid.UUID,
+    alert_id: uuid.UUID,
+    data: ProgramPriceAlertUpdate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_institutional),
+):
+    result = await db.execute(
+        select(ProgramPriceAlert).where(
+            ProgramPriceAlert.id == alert_id,
+            ProgramPriceAlert.program_id == program_id,
+        )
+    )
+    alert = result.scalar_one_or_none()
+    if not alert:
+        raise HTTPException(404, detail="Alerte programme introuvable")
+    for field, value in data.model_dump(exclude_none=True).items():
+        setattr(alert, field, value)
+    if data.current_price is not None or data.threshold_price is not None:
+        alert.is_triggered = bool((alert.current_price or 0) > alert.threshold_price)
+    return alert
+
+
+@router.delete("/programs/{program_id}/alerts/{alert_id}", status_code=204)
+async def delete_program_alert(
+    program_id: uuid.UUID,
+    alert_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_institutional),
+):
+    result = await db.execute(
+        select(ProgramPriceAlert).where(
+            ProgramPriceAlert.id == alert_id,
+            ProgramPriceAlert.program_id == program_id,
+        )
+    )
+    alert = result.scalar_one_or_none()
+    if not alert:
+        raise HTTPException(404, detail="Alerte programme introuvable")
+    await db.delete(alert)
+
+
+@router.post("/programs/{program_id}/scenarios", response_model=ProgramScenarioOut, status_code=201)
+async def create_program_scenario(
+    program_id: uuid.UUID,
+    data: ProgramScenarioCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_institutional),
+):
+    program_result = await db.execute(select(Program).where(Program.id == program_id))
+    if not program_result.scalar_one_or_none():
+        raise HTTPException(404, detail="Programme introuvable")
+    scenario = ProgramScenario(**data.model_dump(), program_id=program_id, created_by_id=current_user.id)
+    db.add(scenario)
+    await db.flush()
+    return scenario
+
+
+@router.patch("/programs/{program_id}/scenarios/{scenario_id}", response_model=ProgramScenarioOut)
+async def update_program_scenario(
+    program_id: uuid.UUID,
+    scenario_id: uuid.UUID,
+    data: ProgramScenarioUpdate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_institutional),
+):
+    result = await db.execute(
+        select(ProgramScenario).where(
+            ProgramScenario.id == scenario_id,
+            ProgramScenario.program_id == program_id,
+        )
+    )
+    scenario = result.scalar_one_or_none()
+    if not scenario:
+        raise HTTPException(404, detail="Scenario introuvable")
+    for field, value in data.model_dump(exclude_none=True).items():
+        setattr(scenario, field, value)
+    return scenario
+
+
+@router.delete("/programs/{program_id}/scenarios/{scenario_id}", status_code=204)
+async def delete_program_scenario(
+    program_id: uuid.UUID,
+    scenario_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_institutional),
+):
+    result = await db.execute(
+        select(ProgramScenario).where(
+            ProgramScenario.id == scenario_id,
+            ProgramScenario.program_id == program_id,
+        )
+    )
+    scenario = result.scalar_one_or_none()
+    if not scenario:
+        raise HTTPException(404, detail="Scenario introuvable")
+    await db.delete(scenario)
 
 
 @router.get("/food-prices")

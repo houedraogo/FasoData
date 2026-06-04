@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, Field
 
@@ -9,6 +9,7 @@ from fasodata.dashboard.models import (
     MetricStatus,
     QualityCheckStatus,
     QualityIssueSeverity,
+    ProgramStatus,
     TeamMemberStatus,
 )
 
@@ -159,3 +160,143 @@ class QualityCheckOut(BaseModel):
     issues: list[QualityIssueOut] = []
 
     model_config = {"from_attributes": True}
+
+
+class DashboardKpiOut(BaseModel):
+    key: str
+    label: str
+    value: int | float | str
+    unit: str | None = None
+    sub: str | None = None
+    change: float = 0
+    spark: list[int | float] = []
+
+
+class DashboardOverviewOut(BaseModel):
+    updated_at: datetime
+    period: str
+    kpis: list[DashboardKpiOut]
+
+
+class DashboardPreferenceBase(BaseModel):
+    domains: list[str] = Field(default_factory=list)
+    data_types: list[str] = Field(default_factory=list)
+    regions: list[str] = Field(default_factory=list)
+
+
+class DashboardPreferenceUpdate(DashboardPreferenceBase):
+    pass
+
+
+class DashboardPreferenceOut(DashboardPreferenceBase):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    is_configured: bool
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class DashboardRecommendationOut(BaseModel):
+    key: str
+    title: str
+    text: str
+    href: str
+    kind: str
+    source: str
+    metric: str | None = None
+    detail: str | None = None
+    icon: str = "database"
+
+
+class DashboardRegionSummaryOut(BaseModel):
+    region: str
+    observations: int
+    avg_price: float
+    latest_date: date | None = None
+
+
+class ProgramCreate(BaseModel):
+    name: str = Field(..., min_length=3, max_length=255)
+    description: str | None = None
+    sector: str = "food_prices"
+    period: str = "12m"
+    status: ProgramStatus = ProgramStatus.active
+    metadata_json: dict | None = None
+
+
+class ProgramUpdate(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    sector: str | None = None
+    period: str | None = None
+    status: ProgramStatus | None = None
+    metadata_json: dict | None = None
+
+
+class ProgramOut(ProgramCreate):
+    id: uuid.UUID
+    owner_id: uuid.UUID | None = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ProgramPriceAlertCreate(BaseModel):
+    commodity: str
+    region: str = "National"
+    threshold_price: float = Field(gt=0)
+    current_price: float | None = None
+    channels: list[str] = ["dashboard"]
+
+
+class ProgramPriceAlertUpdate(BaseModel):
+    commodity: str | None = None
+    region: str | None = None
+    threshold_price: float | None = Field(default=None, gt=0)
+    current_price: float | None = None
+    is_triggered: bool | None = None
+    channels: list[str] | None = None
+
+
+class ProgramPriceAlertOut(ProgramPriceAlertCreate):
+    id: uuid.UUID
+    program_id: uuid.UUID
+    is_triggered: bool
+    created_by_id: uuid.UUID | None = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ProgramScenarioCreate(BaseModel):
+    name: str = Field(..., min_length=3, max_length=255)
+    region_a: str
+    region_b: str
+    commodity: str = "maize"
+    parameters: dict | None = None
+
+
+class ProgramScenarioUpdate(BaseModel):
+    name: str | None = None
+    region_a: str | None = None
+    region_b: str | None = None
+    commodity: str | None = None
+    parameters: dict | None = None
+
+
+class ProgramScenarioOut(ProgramScenarioCreate):
+    id: uuid.UUID
+    program_id: uuid.UUID
+    created_by_id: uuid.UUID | None = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ProgramDetailOut(ProgramOut):
+    alerts: list[ProgramPriceAlertOut] = []
+    scenarios: list[ProgramScenarioOut] = []

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -9,7 +9,8 @@ import {
   User, Building2, Mail, Lock, Eye, EyeOff,
   CheckCircle, Loader2, Shield, Calendar, Camera,
   MessageSquare, TrendingUp, BarChart3, AlertTriangle,
-  Upload, X,
+  Upload, X, Settings2, Wheat, HeartPulse, ClipboardCheck,
+  Droplets, Map, Database, Bell,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
@@ -38,6 +39,54 @@ const passwordSchema = z
 
 type ProfileData  = z.infer<typeof profileSchema>;
 type PasswordData = z.infer<typeof passwordSchema>;
+
+type DashboardPreferences = {
+  domains: string[];
+  dataTypes: string[];
+  regions: string[];
+};
+
+type DashboardPreferencesApi = {
+  domains: string[];
+  data_types: string[];
+  regions: string[];
+  is_configured: boolean;
+};
+
+const DEFAULT_PREFERENCES: DashboardPreferences = {
+  domains: ["prices"],
+  dataTypes: ["time_series", "maps"],
+  regions: ["National"],
+};
+
+const DOMAIN_OPTIONS = [
+  { id: "prices", label: "Prix alimentaires", icon: Wheat },
+  { id: "health", label: "Santé", icon: HeartPulse },
+  { id: "education", label: "Éducation", icon: ClipboardCheck },
+  { id: "water", label: "Eau & assainissement", icon: Droplets },
+  { id: "territory", label: "Territoires", icon: Map },
+];
+
+const DATA_TYPE_OPTIONS = [
+  { id: "time_series", label: "Séries temporelles", icon: BarChart3 },
+  { id: "maps", label: "Cartes", icon: Map },
+  { id: "alerts", label: "Alertes", icon: Bell },
+  { id: "datasets", label: "Datasets publics", icon: Database },
+];
+
+const WATCH_REGIONS = ["National", "Sahel", "Centre", "Est", "Hauts-Bassins", "Nord", "Centre-Nord", "Boucle du Mouhoun"];
+
+function toggleValue(values: string[], value: string) {
+  return values.includes(value) ? values.filter((item) => item !== value) : [...values, value];
+}
+
+function toClientPreferences(preferences: DashboardPreferencesApi): DashboardPreferences {
+  return {
+    domains: preferences.domains,
+    dataTypes: preferences.data_types,
+    regions: preferences.regions,
+  };
+}
 
 // ── Composants UI ─────────────────────────────────────────────────────────
 
@@ -87,6 +136,7 @@ const STATUS_CFG: Record<string, { label: string; color: string }> = {
 
 export default function ProfilPage() {
   const { user, fetchMe } = useAuth();
+  const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [meData, setMeData] = useState<{
@@ -100,6 +150,7 @@ export default function ProfilPage() {
   const [showNew, setShowNew]           = useState(false);
   const [showConfirm, setShowConfirm]   = useState(false);
   const [smsPage, setSmsPage]           = useState(1);
+  const [draftPreferences, setDraftPreferences] = useState<DashboardPreferences>(DEFAULT_PREFERENCES);
 
   useEffect(() => {
     api.get("/auth/me").then(({ data }) => setMeData(data));
@@ -114,6 +165,52 @@ export default function ProfilPage() {
     },
     enabled: !!user,
   });
+
+  const { data: preferenceRecord, isLoading: preferencesLoading } = useQuery<DashboardPreferencesApi>({
+    queryKey: ["dashboard-preferences"],
+    queryFn: async () => {
+      const { data } = await api.get("/dashboard/preferences");
+      return data;
+    },
+    enabled: !!user,
+  });
+
+  useEffect(() => {
+    if (preferenceRecord) setDraftPreferences(toClientPreferences(preferenceRecord));
+  }, [preferenceRecord]);
+
+  const savePreferences = useMutation({
+    mutationFn: async (nextPreferences: DashboardPreferences) => {
+      const { data } = await api.put("/dashboard/preferences", {
+        domains: nextPreferences.domains,
+        data_types: nextPreferences.dataTypes,
+        regions: nextPreferences.regions,
+      });
+      return data as DashboardPreferencesApi;
+    },
+    onSuccess: (saved) => {
+      queryClient.setQueryData(["dashboard-preferences"], saved);
+      queryClient.invalidateQueries({ queryKey: ["dashboard-overview"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-recommendations"] });
+      toast.success("Préférences du dashboard mises à jour");
+    },
+    onError: () => toast.error("Impossible d’enregistrer les préférences"),
+  });
+
+  const handleSavePreferences = () => {
+    if (!draftPreferences.domains.length) {
+      toast.error("Choisissez au moins un domaine");
+      return;
+    }
+    if (!draftPreferences.dataTypes.length) {
+      toast.error("Choisissez au moins un type de données");
+      return;
+    }
+    savePreferences.mutate({
+      ...draftPreferences,
+      regions: draftPreferences.regions.length ? draftPreferences.regions : ["National"],
+    });
+  };
 
   // ── Upload avatar ─────────────────────────────────────────────────────────
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -396,6 +493,115 @@ export default function ProfilPage() {
             </div>
           ))}
         </dl>
+      </SectionCard>
+
+      {/* ── Préférences dashboard ── */}
+      <SectionCard
+        title="Préférences du dashboard"
+        icon={Settings2}
+        action={
+          preferenceRecord?.is_configured ? (
+            <span className="text-[10px] font-semibold text-green-700 bg-green-50 px-2 py-1 rounded-full">
+              Configuré
+            </span>
+          ) : (
+            <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 px-2 py-1 rounded-full">
+              À compléter
+            </span>
+          )
+        }
+      >
+        {preferencesLoading ? (
+          <div className="space-y-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="h-10 bg-gray-100 rounded-xl animate-pulse" />
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-5">
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Domaines suivis</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {DOMAIN_OPTIONS.map(({ id, label, icon: Icon }) => {
+                  const active = draftPreferences.domains.includes(id);
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setDraftPreferences((prev) => ({ ...prev, domains: toggleValue(prev.domains, id) }))}
+                      className={cn(
+                        "flex items-center gap-2 px-3 py-2.5 border rounded-xl text-sm font-medium transition-colors",
+                        active ? "border-[#1A2C42] bg-[#1A2C42]/5 text-[#1A2C42]" : "border-gray-100 text-gray-500 hover:border-gray-200"
+                      )}
+                    >
+                      <Icon className={cn("w-4 h-4", active ? "text-[#E04E2F]" : "text-gray-400")} />
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Types de données</p>
+              <div className="flex flex-wrap gap-2">
+                {DATA_TYPE_OPTIONS.map(({ id, label, icon: Icon }) => {
+                  const active = draftPreferences.dataTypes.includes(id);
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setDraftPreferences((prev) => ({ ...prev, dataTypes: toggleValue(prev.dataTypes, id) }))}
+                      className={cn(
+                        "inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border transition-colors",
+                        active ? "bg-[#E04E2F] text-white border-[#E04E2F]" : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
+                      )}
+                    >
+                      <Icon className="w-3.5 h-3.5" />
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Zones prioritaires</p>
+              <div className="flex flex-wrap gap-2">
+                {WATCH_REGIONS.map((region) => {
+                  const active = draftPreferences.regions.includes(region);
+                  return (
+                    <button
+                      key={region}
+                      type="button"
+                      onClick={() => setDraftPreferences((prev) => ({ ...prev, regions: toggleValue(prev.regions, region) }))}
+                      className={cn(
+                        "px-3 py-2 rounded-lg text-xs font-semibold border transition-colors",
+                        active ? "bg-[#1A2C42] text-white border-[#1A2C42]" : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
+                      )}
+                    >
+                      {region}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 pt-3 border-t border-gray-100">
+              <p className="text-xs text-gray-400">
+                Ces choix alimentent les recommandations et la veille affichées sur la vue d’ensemble.
+              </p>
+              <button
+                type="button"
+                onClick={handleSavePreferences}
+                disabled={savePreferences.isPending}
+                className="btn-primary disabled:opacity-50 shrink-0"
+              >
+                {savePreferences.isPending ? <><Loader2 className="w-4 h-4 animate-spin" />Sauvegarde…</> : "Enregistrer"}
+              </button>
+            </div>
+          </div>
+        )}
       </SectionCard>
 
       {/* ── Modifier le profil ── */}

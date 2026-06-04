@@ -118,7 +118,7 @@ export default function AdminDatasetsPage() {
   // Modal state
   const [modal, setModal] = useState<{
     open: boolean;
-    type: "publish" | "archive" | "delete" | null;
+    type: "publish" | "reject" | "archive" | "delete" | null;
     dataset: Dataset | null;
   }>({ open: false, type: null, dataset: null });
 
@@ -152,6 +152,16 @@ export default function AdminDatasetsPage() {
     onError: () => toast.error("Erreur lors de la mise à jour"),
   });
 
+  const moderateDataset = useMutation({
+    mutationFn: ({ slug, action }: { slug: string; action: "approve" | "reject" }) =>
+      api.post(`/datasets/${slug}/${action}`),
+    onSuccess: (_, { action }) => {
+      queryClient.invalidateQueries({ queryKey: ["admin-datasets"] });
+      toast.success(action === "approve" ? "Dataset approuvé et publié" : "Dataset rejeté en brouillon");
+    },
+    onError: () => toast.error("Erreur lors de la modération"),
+  });
+
   const deleteDataset = useMutation({
     mutationFn: (slug: string) => api.delete(`/datasets/${slug}`),
     onSuccess: () => {
@@ -162,13 +172,14 @@ export default function AdminDatasetsPage() {
   });
 
   // ── Helpers ───────────────────────────────────────────────────────────────
-  const openModal = (type: "publish" | "archive" | "delete", dataset: Dataset) =>
+  const openModal = (type: "publish" | "reject" | "archive" | "delete", dataset: Dataset) =>
     setModal({ open: true, type, dataset });
   const closeModal = () => setModal({ open: false, type: null, dataset: null });
 
   const handleConfirm = () => {
     if (!modal.dataset) return;
-    if (modal.type === "publish")  updateStatus.mutate({ slug: modal.dataset.slug, status: "published" });
+    if (modal.type === "publish")  moderateDataset.mutate({ slug: modal.dataset.slug, action: "approve" });
+    if (modal.type === "reject")   moderateDataset.mutate({ slug: modal.dataset.slug, action: "reject" });
     if (modal.type === "archive")  updateStatus.mutate({ slug: modal.dataset.slug, status: "archived" });
     if (modal.type === "delete")   deleteDataset.mutate(modal.dataset.slug);
   };
@@ -387,15 +398,27 @@ export default function AdminDatasetsPage() {
                           </Link>
                         )}
 
-                        {/* Publier (draft / pending) */}
+                        {/* Approuver (draft / pending) */}
                         {(ds.status === "draft" || ds.status === "pending") && (
                           <button
                             onClick={() => openModal("publish", ds)}
                             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg transition-colors"
-                            title="Publier ce dataset"
+                            title="Approuver et publier ce dataset"
                           >
                             <CheckCircle2 className="w-3.5 h-3.5" />
-                            Publier
+                            Approuver
+                          </button>
+                        )}
+
+                        {/* Rejeter (pending) */}
+                        {ds.status === "pending" && (
+                          <button
+                            onClick={() => openModal("reject", ds)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                            title="Rejeter et renvoyer en brouillon"
+                          >
+                            <XCircle className="w-3.5 h-3.5" />
+                            Rejeter
                           </button>
                         )}
 
@@ -498,23 +521,29 @@ export default function AdminDatasetsPage() {
       <ConfirmModal
         open={modal.open}
         title={
-          modal.type === "publish" ? "Publier ce dataset ?" :
+          modal.type === "publish" ? "Approuver ce dataset ?" :
+          modal.type === "reject" ? "Rejeter ce dataset ?" :
           modal.type === "archive" ? "Archiver ce dataset ?" :
           "Supprimer ce dataset ?"
         }
         message={
           modal.type === "publish"
             ? `"${modal.dataset?.name}" sera visible par tous les utilisateurs publics.`
+            : modal.type === "reject"
+            ? `"${modal.dataset?.name}" retournera en brouillon pour correction par l'organisation.`
             : modal.type === "archive"
             ? `"${modal.dataset?.name}" sera masqué du portail public. Il restera accessible aux admins.`
             : `Cette action est irréversible. "${modal.dataset?.name}" et toutes ses données seront définitivement supprimés.`
         }
         confirmLabel={
-          modal.type === "publish" ? "Publier" :
+          modal.type === "publish" ? "Approuver" :
+          modal.type === "reject" ? "Rejeter" :
           modal.type === "archive" ? "Archiver" : "Supprimer"
         }
         confirmClass={
           modal.type === "delete"
+            ? "bg-red-500 hover:bg-red-600"
+            : modal.type === "reject"
             ? "bg-red-500 hover:bg-red-600"
             : modal.type === "archive"
             ? "bg-orange-500 hover:bg-orange-600"

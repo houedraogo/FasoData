@@ -102,7 +102,7 @@ export default function RapportsPage() {
       );
 
       // Vérifier Content-Type
-      const ct = response.headers?.["content-type"] ?? "";
+      const ct = String(response.headers?.["content-type"] ?? "");
       if (!ct.includes("csv") && !ct.includes("text")) {
         const msg = await (response.data as Blob).text().catch(() => "Erreur");
         try {

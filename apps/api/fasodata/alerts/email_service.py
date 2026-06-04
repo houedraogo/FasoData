@@ -187,6 +187,65 @@ def send_price_alert_email(
     return _send(to_email, subject, body_html, unsubscribe_url, settings)
 
 
+def send_invitation_email(
+    to_email: str,
+    invited_by_name: str,
+    organization: str,
+    role: str,
+    register_url: str,
+    settings,
+) -> bool:
+    """Email d'invitation à rejoindre une organisation sur FasoData."""
+    subject = f"📩 {invited_by_name} vous invite à rejoindre {organization} sur FasoData"
+
+    body_html = f"""
+      <h2 style="color:#1A2C42;margin:0 0 8px">Vous êtes invité sur FasoData</h2>
+      <p style="color:#6b7280;margin:0 0 20px;font-size:14px;line-height:1.6">
+        <strong style="color:#1A2C42">{invited_by_name}</strong> vous invite à rejoindre
+        l'organisation <strong style="color:#1A2C42">{organization}</strong> sur la plateforme
+        de données ouvertes FasoData.
+      </p>
+
+      <div style="background:#f8f9fa;border-radius:12px;padding:20px;margin-bottom:24px">
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="color:#6b7280;font-size:13px;padding:4px 0">Organisation</td>
+            <td style="color:#111;font-weight:600;font-size:13px;text-align:right">{organization}</td>
+          </tr>
+          <tr>
+            <td style="color:#6b7280;font-size:13px;padding:4px 0">Rôle attribué</td>
+            <td style="color:#1A2C42;font-weight:700;font-size:13px;text-align:right">{role}</td>
+          </tr>
+          <tr>
+            <td style="color:#6b7280;font-size:13px;padding:4px 0">Invité par</td>
+            <td style="color:#111;font-weight:600;font-size:13px;text-align:right">{invited_by_name}</td>
+          </tr>
+        </table>
+      </div>
+
+      <p style="color:#6b7280;font-size:13px;line-height:1.6;margin:0 0 24px">
+        FasoData est la plateforme de données ouvertes du Burkina Faso. En rejoignant
+        {organization}, vous aurez accès aux datasets, aux indicateurs et aux outils
+        d'analyse partagés par votre équipe.
+      </p>
+
+      <div style="text-align:center;margin:28px 0">
+        <a href="{register_url}" style="
+          display:inline-block;background:#E04E2F;color:white;
+          font-weight:700;font-size:15px;padding:14px 36px;
+          border-radius:12px;text-decoration:none;
+        ">✅ Rejoindre {organization} →</a>
+      </div>
+
+      <p style="color:#9ca3af;font-size:11px;text-align:center;margin:0">
+        Si vous n'attendiez pas cette invitation, ignorez cet email.
+      </p>
+    """
+
+    unsubscribe_url = register_url.split("/auth/")[0] + "/"
+    return _send(to_email, subject, body_html, unsubscribe_url, settings)
+
+
 def send_password_reset_email(
     to_email: str,
     reset_url: str,

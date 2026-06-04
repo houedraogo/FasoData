@@ -1148,9 +1148,30 @@ async def create_team_member(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_institutional),
 ):
+    from fasodata.core.config import get_settings
+    settings = get_settings()
+
     member = TeamMember(**data.model_dump(), invited_by_id=current_user.id)
     db.add(member)
     await db.flush()
+
+    # Envoyer l'email d'invitation
+    try:
+        from fasodata.alerts.email_service import send_invitation_email
+        inviter_name = current_user.full_name or current_user.email
+        register_url = f"{settings.public_app_base_url}/auth/inscription"
+        send_invitation_email(
+            to_email=data.email,
+            invited_by_name=inviter_name,
+            organization=data.organization,
+            role=data.role,
+            register_url=register_url,
+            settings=settings,
+        )
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning(f"Invitation email non envoyé → {data.email}: {exc}")
+
     return member
 
 

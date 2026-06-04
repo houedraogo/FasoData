@@ -24,6 +24,7 @@ celery_app.conf.update(
     timezone="Africa/Ouagadougou",   # UTC+0 (même heure que WAT)
     enable_utc=True,
     task_track_started=True,
+    broker_connection_retry_on_startup=True,  # Évite le CPendingDeprecationWarning Celery 6
     task_routes={
         "fasodata.ingest.tasks.*":  {"queue": "imports"},
         "fasodata.reports.tasks.*": {"queue": "exports"},

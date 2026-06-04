@@ -1,20 +1,28 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from fasodata.auth.deps import get_current_active_user
+from fasodata.core.config import get_settings
 from fasodata.core.database import get_db
 from fasodata.core.security import (
     create_access_token,
     create_refresh_token,
+    create_reset_token,
+    decode_reset_token,
     decode_token,
     hash_password,
     verify_password,
 )
 from fasodata.users.models import User
 from fasodata.users.schemas import UserCreate, UserOut
+
+logger   = logging.getLogger(__name__)
+settings = get_settings()
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -93,3 +101,81 @@ async def refresh_token(data: RefreshRequest, db: AsyncSession = Depends(get_db)
 @router.get("/me", response_model=UserOut)
 async def me(current_user: User = Depends(get_current_active_user)):
     return current_user
+
+
+# ── Réinitialisation mot de passe ──────────────────────────────────────────────
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(..., min_length=8, max_length=128)
+
+
+class MessageResponse(BaseModel):
+    message: str
+
+
+@router.post("/forgot-password", response_model=MessageResponse)
+async def forgot_password(
+    data: ForgotPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Envoie un lien de réinitialisation à l'email fourni.
+    Retourne toujours 200 pour éviter l'énumération d'emails (sécurité).
+    """
+    # Message générique — identique qu'un compte existe ou non
+    generic_msg = "Si un compte correspond à cet email, un lien de réinitialisation a été envoyé."
+
+    result = await db.execute(select(User).where(User.email == data.email))
+    user   = result.scalar_one_or_none()
+
+    if user and user.is_active:
+        token     = create_reset_token(str(user.id))
+        reset_url = f"{settings.public_app_base_url}/auth/reinitialiser-mot-de-passe?token={token}"
+
+        try:
+            from fasodata.alerts.email_service import send_password_reset_email
+            send_password_reset_email(user.email, reset_url, settings)
+        except Exception as exc:
+            logger.error(f"Erreur envoi email reset → {user.email}: {exc}")
+            # On ne lève pas d'erreur côté client (message générique conservé)
+    else:
+        logger.info(f"Demande reset pour email inconnu/inactif : {data.email}")
+
+    return MessageResponse(message=generic_msg)
+
+
+@router.post("/reset-password", response_model=MessageResponse)
+async def reset_password(
+    data: ResetPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Réinitialise le mot de passe via le token reçu par email.
+    Le token est valable 30 minutes et contient l'user_id (JWT signé).
+    """
+    try:
+        user_id = decode_reset_token(data.token)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Lien invalide ou expiré. Refaites une demande de réinitialisation. ({exc})",
+        )
+
+    result = await db.execute(select(User).where(User.id == user_id))
+    user   = result.scalar_one_or_none()
+
+    if not user or not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Compte introuvable ou désactivé.",
+        )
+
+    user.hashed_password = hash_password(data.new_password)
+    logger.info(f"Mot de passe réinitialisé → {user.email}")
+
+    return MessageResponse(message="Mot de passe réinitialisé avec succès. Vous pouvez maintenant vous connecter.")

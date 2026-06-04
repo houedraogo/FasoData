@@ -187,6 +187,47 @@ def send_price_alert_email(
     return _send(to_email, subject, body_html, unsubscribe_url, settings)
 
 
+def send_password_reset_email(
+    to_email: str,
+    reset_url: str,
+    settings,
+) -> bool:
+    """Email de réinitialisation de mot de passe (lien valable 30 min)."""
+    subject = "🔑 Réinitialisation de votre mot de passe FasoData"
+
+    body_html = f"""
+      <h2 style="color:#1A2C42;margin:0 0 8px">Réinitialisation du mot de passe</h2>
+      <p style="color:#6b7280;margin:0 0 20px;font-size:14px;line-height:1.6">
+        Vous avez demandé la réinitialisation de votre mot de passe FasoData.
+        Cliquez sur le bouton ci-dessous pour choisir un nouveau mot de passe.
+      </p>
+
+      <div style="background:#f8f9fa;border-radius:12px;padding:16px 20px;margin-bottom:24px;border-left:4px solid #E04E2F">
+        <p style="margin:0;color:#374151;font-size:13px">
+          ⏱️ <strong>Ce lien expire dans 30 minutes.</strong><br>
+          Si vous n'avez pas fait cette demande, ignorez cet email — votre mot de passe reste inchangé.
+        </p>
+      </div>
+
+      <div style="text-align:center;margin:28px 0">
+        <a href="{reset_url}" style="
+          display:inline-block;background:#E04E2F;color:white;
+          font-weight:700;font-size:15px;padding:14px 36px;
+          border-radius:12px;text-decoration:none;
+        ">🔑 Réinitialiser mon mot de passe →</a>
+      </div>
+
+      <p style="color:#9ca3af;font-size:11px;text-align:center;margin:16px 0 0;word-break:break-all">
+        Si le bouton ne fonctionne pas, copiez ce lien dans votre navigateur :<br>
+        <span style="color:#6b7280">{reset_url}</span>
+      </p>
+    """
+
+    # Pas de lien de désabonnement pour les emails transactionnels
+    unsubscribe_url = f"{reset_url.split('/auth/')[0]}/"
+    return _send(to_email, subject, body_html, unsubscribe_url, settings)
+
+
 def _send(
     to_email: str,
     subject: str,

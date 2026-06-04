@@ -40,3 +40,29 @@ def decode_token(token: str) -> dict:
         return jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
     except JWTError as e:
         raise ValueError(f"Token invalide: {e}") from e
+
+
+# ── Reset mot de passe ────────────────────────────────────────────────────────
+
+RESET_TOKEN_EXPIRE_MINUTES = 30
+
+
+def create_reset_token(user_id: str) -> str:
+    """Génère un JWT à usage unique valable 30 minutes pour la réinitialisation."""
+    expire = datetime.now(timezone.utc) + timedelta(minutes=RESET_TOKEN_EXPIRE_MINUTES)
+    payload = {"sub": user_id, "exp": expire, "type": "reset"}
+    return jwt.encode(payload, settings.secret_key, algorithm=settings.algorithm)
+
+
+def decode_reset_token(token: str) -> str:
+    """Décode le token reset et retourne l'user_id, lève ValueError si invalide/expiré."""
+    try:
+        payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
+    except JWTError as e:
+        raise ValueError(f"Token expiré ou invalide : {e}") from e
+    if payload.get("type") != "reset":
+        raise ValueError("Type de token incorrect")
+    user_id = payload.get("sub")
+    if not user_id:
+        raise ValueError("Token malformé")
+    return user_id

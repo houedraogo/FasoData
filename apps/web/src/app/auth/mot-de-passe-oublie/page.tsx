@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Mail, ArrowLeft, Database, CheckCircle, Loader2 } from "lucide-react";
+import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 export default function MotDePasseOubliePage() {
@@ -16,10 +17,15 @@ export default function MotDePasseOubliePage() {
     if (!email.includes("@")) { setError("Adresse email invalide"); return; }
     setError("");
     setLoading(true);
-    // Simulation — pas d'endpoint de réinitialisation implémenté côté backend
-    await new Promise((r) => setTimeout(r, 1200));
-    setLoading(false);
-    setSent(true);
+    try {
+      await api.post("/auth/forgot-password", { email });
+      setSent(true);
+    } catch {
+      // L'API retourne toujours 200 — si on arrive ici c'est une erreur réseau
+      setError("Erreur réseau. Vérifiez votre connexion et réessayez.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

@@ -129,25 +129,117 @@ async def list_commodities(db: AsyncSession = Depends(get_db)):
 
 @router.get("/latest")
 async def latest_prices(
-    region: str = "National",
+    region:  str = "National",
+    country: str = "BFA",
     db: AsyncSession = Depends(get_db),
 ):
-    """Dernier prix de chaque produit pour une région."""
-    # Sous-requête : max date par produit + région
+    """Dernier prix de chaque produit pour une région et un pays."""
     subq = (
         select(PriceData.commodity, func.max(PriceData.price_date).label("max_date"))
-        .where(PriceData.region == region)
+        .where(PriceData.region == region, PriceData.country == country)
         .group_by(PriceData.commodity)
         .subquery()
     )
     result = await db.execute(
         select(PriceData)
         .join(subq, (PriceData.commodity == subq.c.commodity) & (PriceData.price_date == subq.c.max_date))
-        .where(PriceData.region == region)
+        .where(PriceData.region == region, PriceData.country == country)
         .order_by(PriceData.commodity)
     )
     rows = result.scalars().all()
     return [PriceDataOut.model_validate(r) for r in rows]
+
+
+@router.get("/compare")
+async def compare_countries(
+    commodity: str = Query("maize", description="Produit : sorghum, maize, millet…"),
+    region:    str = Query("National"),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Comparaison inter-pays : prix actuels + série annuelle pour BFA, MLI, NER.
+    Retourne : current_prices, series (2020→présent, annuel), meta pays.
+    """
+    commodity = COMMODITY_ALIASES.get(commodity.lower(), commodity)
+    countries  = ["BFA", "MLI", "NER"]
+
+    # ── Prix actuels par pays ─────────────────────────────────────────────────
+    current: dict[str, dict] = {}
+    for country in countries:
+        subq = (
+            select(func.max(PriceData.price_date).label("max_date"))
+            .where(PriceData.commodity == commodity,
+                   PriceData.region    == region,
+                   PriceData.country   == country)
+            .subquery()
+        )
+        row = (await db.execute(
+            select(PriceData)
+            .where(PriceData.commodity == commodity,
+                   PriceData.region    == region,
+                   PriceData.country   == country,
+                   PriceData.price_date == subq.c.max_date)
+            .limit(1)
+        )).scalar_one_or_none()
+
+        current[country] = {
+            "country":    country,
+            "name":       COUNTRY_META.get(country, {}).get("name", country),
+            "color":      COUNTRY_META.get(country, {}).get("color", "#888"),
+            "price":      round(row.price, 0) if row else None,
+            "price_date": row.price_date.isoformat() if row else None,
+            "unit":       row.unit if row else "CFA/kg",
+        }
+
+    # ── Série annuelle 2020→présent ───────────────────────────────────────────
+    rows = (await db.execute(
+        select(
+            PriceData.country,
+            func.extract("year", PriceData.price_date).label("year"),
+            func.avg(PriceData.price).label("avg_price"),
+        )
+        .where(
+            PriceData.commodity == commodity,
+            PriceData.region    == region,
+            PriceData.country.in_(countries),
+        )
+        .group_by(PriceData.country, func.extract("year", PriceData.price_date))
+        .order_by(PriceData.country, "year")
+    )).all()
+
+    # Pivot : { year: { BFA: prix, MLI: prix, NER: prix } }
+    series_map: dict[int, dict] = {}
+    for row in rows:
+        yr = int(row.year)
+        if yr not in series_map:
+            series_map[yr] = {"year": yr}
+        series_map[yr][row.country] = round(row.avg_price, 0)
+
+    series = sorted(series_map.values(), key=lambda x: x["year"])
+
+    # ── Stats (min/max/variation) ─────────────────────────────────────────────
+    prices_with_data = [v for v in current.values() if v["price"] is not None]
+    if prices_with_data:
+        most_expensive  = max(prices_with_data, key=lambda x: x["price"])
+        cheapest        = min(prices_with_data, key=lambda x: x["price"])
+        spread_pct      = round(((most_expensive["price"] - cheapest["price"]) / cheapest["price"]) * 100, 1) if cheapest["price"] else 0
+    else:
+        most_expensive = cheapest = None
+        spread_pct = 0
+
+    return {
+        "commodity":      commodity,
+        "commodity_label": COMMODITY_LABELS.get(commodity, commodity),
+        "region":          region,
+        "current_prices":  list(current.values()),
+        "series":          series,
+        "stats": {
+            "most_expensive":  most_expensive,
+            "cheapest":        cheapest,
+            "spread_pct":      spread_pct,
+            "countries_count": len([v for v in current.values() if v["price"] is not None]),
+        },
+    }
 
 
 @router.get("/series", response_model=PriceSeries)

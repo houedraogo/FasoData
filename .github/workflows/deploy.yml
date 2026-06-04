@@ -51,7 +51,7 @@ jobs:
             ./ ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:${{ env.APP_DIR }}/
 
       # ── 4. Rebuild et redémarrage sur le VPS ─────────────────────────────
-      - name: 🔨 Rebuild Docker + Redémarrage
+      - name: 🔨 Rebuild Docker + Migrations + Redémarrage
         run: |
           ssh -o StrictHostKeyChecking=no ${{ env.VPS_USER }}@${{ env.VPS_HOST }} << 'ENDSSH'
             set -e
@@ -62,6 +62,11 @@ jobs:
 
             echo "🌐 Rebuild du Frontend..."
             docker compose -f infra/compose.prod.yml --env-file .env.production build web
+
+            echo "🗄️ Migrations Alembic (upgrade head)..."
+            docker compose -f infra/compose.prod.yml --env-file .env.production run --rm \
+              --no-deps api \
+              alembic -c /app/alembic.ini upgrade head
 
             echo "🔄 Redémarrage des services..."
             docker compose -f infra/compose.prod.yml --env-file .env.production stop nginx api worker beat web

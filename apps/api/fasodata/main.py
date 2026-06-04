@@ -1,14 +1,15 @@
+import logging
+import os
 from contextlib import asynccontextmanager
 
+from alembic import command as alembic_command
+from alembic.config import Config as AlembicConfig
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 
 from fasodata.auth.router import router as auth_router
-from sqlalchemy import text
-
 from fasodata.core.config import get_settings
-from fasodata.core.database import Base, engine
 from fasodata.datasets.router import router as datasets_router
 from fasodata.dashboard.router import router as dashboard_router
 from fasodata.geo.router import router as geo_router
@@ -19,33 +20,29 @@ from fasodata.reports.router import router as reports_router
 from fasodata.search.router import router as search_router
 from fasodata.users.router import router as users_router
 
+logger = logging.getLogger(__name__)
 settings = get_settings()
+
+
+def _run_migrations() -> None:
+    """Applique les migrations Alembic (upgrade head) au démarrage."""
+    alembic_ini = os.path.join(os.path.dirname(__file__), "..", "alembic.ini")
+    alembic_ini = os.path.abspath(alembic_ini)
+    cfg = AlembicConfig(alembic_ini)
+    # Override de l'URL depuis l'env (identique à env.py)
+    cfg.set_main_option("sqlalchemy.url", settings.database_url)
+    try:
+        alembic_command.upgrade(cfg, "head")
+        logger.info("✅ Migrations Alembic appliquées avec succès")
+    except Exception as exc:
+        logger.error(f"❌ Erreur migration Alembic : {exc}")
+        raise
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Créer les tables au démarrage (remplacé par Alembic en prod)
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-        # Migrations additives idempotentes (ADD COLUMN IF NOT EXISTS)
-        for stmt in [
-            # price_data
-            "ALTER TABLE price_data ADD COLUMN IF NOT EXISTS validation_status VARCHAR(20) DEFAULT 'auto'",
-            "ALTER TABLE price_data ADD COLUMN IF NOT EXISTS validated_by  VARCHAR(100)",
-            "ALTER TABLE price_data ADD COLUMN IF NOT EXISTS validated_at  TIMESTAMPTZ",
-            "ALTER TABLE price_data ADD COLUMN IF NOT EXISTS anomaly_score INTEGER",
-            "ALTER TABLE price_data ADD COLUMN IF NOT EXISTS country VARCHAR(3) DEFAULT 'BFA'",
-            # alert_subscriptions
-            "ALTER TABLE alert_subscriptions ADD COLUMN IF NOT EXISTS whatsapp_number VARCHAR(30)",
-            # programs
-            "CREATE TABLE IF NOT EXISTS programs (id UUID PRIMARY KEY, name VARCHAR(255) NOT NULL, description TEXT, sector VARCHAR(120) NOT NULL DEFAULT 'food_prices', period VARCHAR(40) NOT NULL DEFAULT '12m', status VARCHAR(20) NOT NULL DEFAULT 'active', owner_id UUID REFERENCES users(id) ON DELETE SET NULL, metadata_json JSONB, created_at TIMESTAMPTZ DEFAULT now(), updated_at TIMESTAMPTZ DEFAULT now())",
-            "CREATE TABLE IF NOT EXISTS program_price_alerts (id UUID PRIMARY KEY, program_id UUID NOT NULL REFERENCES programs(id) ON DELETE CASCADE, commodity VARCHAR(80) NOT NULL, region VARCHAR(120) NOT NULL DEFAULT 'National', threshold_price DOUBLE PRECISION NOT NULL, current_price DOUBLE PRECISION, is_triggered BOOLEAN NOT NULL DEFAULT false, channels JSONB DEFAULT '[]'::jsonb, created_by_id UUID REFERENCES users(id) ON DELETE SET NULL, created_at TIMESTAMPTZ DEFAULT now(), updated_at TIMESTAMPTZ DEFAULT now())",
-            "CREATE TABLE IF NOT EXISTS program_scenarios (id UUID PRIMARY KEY, program_id UUID NOT NULL REFERENCES programs(id) ON DELETE CASCADE, name VARCHAR(255) NOT NULL, region_a VARCHAR(120) NOT NULL, region_b VARCHAR(120) NOT NULL, commodity VARCHAR(80) NOT NULL DEFAULT 'maize', parameters JSONB, created_by_id UUID REFERENCES users(id) ON DELETE SET NULL, created_at TIMESTAMPTZ DEFAULT now())",
-            "CREATE TABLE IF NOT EXISTS dashboard_preferences (id UUID PRIMARY KEY, user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE, domains JSONB NOT NULL DEFAULT '[]'::jsonb, data_types JSONB NOT NULL DEFAULT '[]'::jsonb, regions JSONB NOT NULL DEFAULT '[]'::jsonb, is_configured BOOLEAN NOT NULL DEFAULT false, created_at TIMESTAMPTZ DEFAULT now(), updated_at TIMESTAMPTZ DEFAULT now())",
-            "ALTER TABLE dashboard_preferences ADD COLUMN IF NOT EXISTS is_configured BOOLEAN NOT NULL DEFAULT false",
-            "CREATE UNIQUE INDEX IF NOT EXISTS uq_dashboard_preferences_user_id ON dashboard_preferences(user_id)",
-        ]:
-            await conn.execute(text(stmt))
+    # Lancer les migrations Alembic (idempotentes — IF NOT EXISTS dans 0001)
+    _run_migrations()
     # Initialiser Africa's Talking SMS
     at_service.initialize(settings.at_username, settings.at_api_key)
     yield

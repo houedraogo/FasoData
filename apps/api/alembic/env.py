@@ -10,10 +10,13 @@ config = context.config
 if config.config_file_name:
     fileConfig(config.config_file_name)
 
-# Importer tous les modèles pour que Alembic les détecte
+# Importer TOUS les modèles pour que Alembic les détecte
 from fasodata.core.database import Base  # noqa
 import fasodata.users.models  # noqa
 import fasodata.datasets.models  # noqa
+import fasodata.prices.models  # noqa
+import fasodata.alerts.models  # noqa
+import fasodata.dashboard.models  # noqa
 
 target_metadata = Base.metadata
 

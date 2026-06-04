@@ -32,16 +32,122 @@ class ExportRequest(BaseModel):
     filters: dict | None = None
 
 
-# ── Export CSV dataset ────────────────────────────────────────────────────────
+# ── Export CSV dataset (synchrone — stream direct) ────────────────────────────
 
 @router.post("/{dataset_id}/export/csv")
 async def export_csv(
     dataset_id: uuid.UUID,
     body: ExportRequest = ExportRequest(),
-    current_user: User = Depends(require_institutional),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
-    task = export_csv_task.delay(str(dataset_id), body.filters)
-    return {"task_id": task.id, "status": "queued"}
+    """
+    Exporte un dataset en CSV et le retourne directement en streaming.
+    - Dataset avec s3_key : lit depuis MinIO
+    - Dataset prix (slug prix-*) : génère depuis price_data
+    - Autres datasets seedés sans s3_key : génère depuis les métadonnées
+    """
+    result = await db.execute(select(Dataset).where(Dataset.id == dataset_id))
+    dataset = result.scalar_one_or_none()
+    if not dataset:
+        raise HTTPException(404, detail="Dataset introuvable")
+
+    import csv as csv_mod
+    output = []
+
+    # ── Cas 1 : fichier physique dans MinIO ──────────────────────────────────
+    if dataset.s3_key:
+        try:
+            from minio import Minio
+            import io as _io
+            client = Minio(
+                settings.minio_endpoint,
+                access_key=settings.minio_access_key,
+                secret_key=settings.minio_secret_key,
+                secure=settings.minio_secure,
+            )
+            resp = client.get_object(settings.minio_bucket, dataset.s3_key)
+            content = resp.read()
+            resp.close(); resp.release_conn()
+            dataset.download_count += 1
+
+            filename = f"export-{dataset.slug}.csv"
+            return Response(
+                content=content,
+                media_type="text/csv; charset=utf-8",
+                headers={
+                    "Content-Disposition": f'attachment; filename="{filename}"',
+                    "Content-Length": str(len(content)),
+                },
+            )
+        except Exception as e:
+            raise HTTPException(500, f"Erreur lecture MinIO : {e}")
+
+    # ── Cas 2 : dataset prix → générer depuis price_data ────────────────────
+    is_price_dataset = (
+        "prix" in (dataset.slug or "").lower() or
+        "price" in (dataset.category or "").lower() or
+        dataset.slug == "prix-alimentaires-burkina-faso"
+    )
+    if is_price_dataset:
+        rows_q = (await db.execute(
+            select(PriceData)
+            .order_by(PriceData.price_date.desc(), PriceData.commodity)
+            .limit(10_000)
+        )).scalars().all()
+
+        import io as _io, csv as _csv
+        buf = _io.StringIO()
+        writer = _csv.writer(buf)
+        writer.writerow(["pays", "commodity", "region", "marche", "prix", "unite",
+                          "qualite", "date", "source", "statut_validation", "date_creation"])
+        for r in rows_q:
+            writer.writerow([
+                r.country, r.commodity, r.region, r.market or "",
+                r.price, r.unit, r.quality or "",
+                r.price_date.isoformat(), r.source,
+                r.validation_status, r.created_at.date().isoformat(),
+            ])
+
+        dataset.download_count += 1
+        content = buf.getvalue().encode("utf-8-sig")  # BOM pour Excel
+        filename = f"prix-alimentaires-fasodata-{date.today().isoformat()}.csv"
+        return Response(
+            content=content,
+            media_type="text/csv; charset=utf-8",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Content-Length": str(len(content)),
+            },
+        )
+
+    # ── Cas 3 : autres datasets seedés — métadonnées en CSV ─────────────────
+    import io as _io, csv as _csv
+    buf = _io.StringIO()
+    writer = _csv.writer(buf)
+    writer.writerow(["champ", "valeur"])
+    writer.writerow(["nom", dataset.name])
+    writer.writerow(["slug", dataset.slug])
+    writer.writerow(["categorie", dataset.category or ""])
+    writer.writerow(["source", dataset.source or ""])
+    writer.writerow(["licence", dataset.license.value if hasattr(dataset.license, "value") else dataset.license])
+    writer.writerow(["nb_lignes", dataset.row_count or 0])
+    writer.writerow(["format", dataset.file_format or ""])
+    writer.writerow(["statut", dataset.status.value if hasattr(dataset.status, "value") else dataset.status])
+    writer.writerow(["cree_le", dataset.created_at.date().isoformat()])
+    writer.writerow(["publie_le", dataset.published_at.date().isoformat() if dataset.published_at else ""])
+    writer.writerow(["description", dataset.description or ""])
+    writer.writerow(["", ""])
+    writer.writerow(["note", "Les données brutes de ce dataset ne sont pas encore disponibles en téléchargement direct."])
+    writer.writerow(["contact", "contact@fasodata.com"])
+
+    content = buf.getvalue().encode("utf-8-sig")
+    filename = f"metadata-{dataset.slug}.csv"
+    return Response(
+        content=content,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 # ── Export PDF dataset ────────────────────────────────────────────────────────

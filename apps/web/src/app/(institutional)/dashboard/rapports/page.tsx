@@ -77,61 +77,58 @@ export default function RapportsPage() {
     return () => Object.values(pollingRefs.current).forEach(clearInterval);
   }, []);
 
-  // Démarrer le polling pour un job
-  const startPolling = (job: ExportJob) => {
-    const interval = setInterval(async () => {
-      try {
-        const { data } = await api.get(`/reports/tasks/${job.taskId}`);
-        if (data.status === "done") {
-          clearInterval(pollingRefs.current[job.taskId]);
-          delete pollingRefs.current[job.taskId];
-          setJobs((prev) =>
-            prev.map((j) =>
-              j.taskId === job.taskId
-                ? { ...j, status: "done", downloadUrl: data.result?.download_url, rows: data.result?.rows }
-                : j
-            )
-          );
-          toast.success("Export prêt à télécharger !");
-        } else if (data.status === "failure") {
-          clearInterval(pollingRefs.current[job.taskId]);
-          delete pollingRefs.current[job.taskId];
-          setJobs((prev) =>
-            prev.map((j) => (j.taskId === job.taskId ? { ...j, status: "error" } : j))
-          );
-        } else {
-          setJobs((prev) =>
-            prev.map((j) =>
-              j.taskId === job.taskId ? { ...j, status: "running" } : j
-            )
-          );
-        }
-      } catch {
-        /* ignore */
-      }
-    }, 2000);
-    pollingRefs.current[job.taskId] = interval;
-  };
-
-  // Générer un export
+  // Générer un export CSV (synchrone — téléchargement direct)
   const handleGenerate = async () => {
     if (!selectedId) { toast.error("Sélectionnez un dataset"); return; }
     setIsGenerating(true);
+
+    // Ajouter le job en état "running" immédiatement
+    const jobId = crypto.randomUUID();
+    const job: ExportJob = {
+      id: jobId,
+      datasetId: selectedId,
+      datasetName: selectedName,
+      taskId: jobId,
+      status: "running",
+      createdAt: new Date(),
+    };
+    setJobs((prev) => [job, ...prev]);
+
     try {
-      const { data } = await api.post(`/reports/${selectedId}/export/csv`, {});
-      const job: ExportJob = {
-        id: crypto.randomUUID(),
-        datasetId: selectedId,
-        datasetName: selectedName,
-        taskId: data.task_id,
-        status: "queued",
-        createdAt: new Date(),
-      };
-      setJobs((prev) => [job, ...prev]);
-      startPolling(job);
-      toast.success("Export lancé — traitement en cours…");
-    } catch {
-      toast.error("Impossible de lancer l'export");
+      const response = await api.post(
+        `/reports/${selectedId}/export/csv`,
+        {},
+        { responseType: "blob" }
+      );
+
+      // Vérifier Content-Type
+      const ct = response.headers?.["content-type"] ?? "";
+      if (!ct.includes("csv") && !ct.includes("text")) {
+        const msg = await (response.data as Blob).text().catch(() => "Erreur");
+        try {
+          const err = JSON.parse(msg);
+          throw new Error(err.detail ?? "Erreur serveur");
+        } catch { throw new Error(msg); }
+      }
+
+      // Récupérer nb lignes depuis Content-Disposition ou compter
+      const text = await (response.data as Blob).text();
+      const rows = Math.max(0, text.split("\n").length - 2); // -1 header, -1 ligne vide finale
+
+      downloadBlob(
+        new Blob([response.data], { type: "text/csv;charset=utf-8" }),
+        `export-${selectedName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${new Date().toISOString().slice(0,10)}.csv`
+      );
+
+      setJobs((prev) => prev.map((j) => j.id === jobId
+        ? { ...j, status: "done", rows }
+        : j
+      ));
+      toast.success(`✅ Export CSV téléchargé (${rows.toLocaleString("fr-FR")} lignes)`);
+    } catch (err: unknown) {
+      setJobs((prev) => prev.map((j) => j.id === jobId ? { ...j, status: "error" } : j));
+      const msg = err instanceof Error ? err.message : "Impossible de générer l'export";
+      toast.error(msg);
     } finally {
       setIsGenerating(false);
     }
@@ -457,14 +454,14 @@ export default function RapportsPage() {
         )}
       </div>
 
-      {/* Aide */}
-      <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 text-sm">
-        <h3 className="font-semibold text-amber-800 mb-2">ℹ️ À savoir</h3>
-        <ul className="space-y-1 text-amber-700 text-xs">
-          <li>• Les exports sont générés de façon asynchrone via Celery.</li>
-          <li>• Les liens de téléchargement sont valables <strong>30 minutes</strong>.</li>
-          <li>• Pour des exports filtrés avancés, utilisez l'API REST directement.</li>
-          <li>• L'historique des exports n'est pas persisté entre sessions.</li>
+      {/* Info */}
+      <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5 text-sm">
+        <h3 className="font-semibold text-blue-800 mb-2">ℹ️ À savoir</h3>
+        <ul className="space-y-1 text-blue-700 text-xs">
+          <li>• Les exports CSV et PDF sont générés instantanément et téléchargés directement.</li>
+          <li>• Le dataset <strong>Prix alimentaires</strong> exporte jusqu'à 10 000 observations depuis la base FasoData.</li>
+          <li>• L'historique des exports est conservé pendant la session courante.</li>
+          <li>• Pour des exports filtrés avancés, consultez la <a href="/developers" className="underline">documentation API</a>.</li>
         </ul>
       </div>
     </div>

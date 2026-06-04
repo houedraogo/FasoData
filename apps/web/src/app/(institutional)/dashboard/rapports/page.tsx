@@ -137,22 +137,66 @@ export default function RapportsPage() {
     }
   };
 
+  /** Télécharge un blob PDF — compatible tous navigateurs */
+  const downloadBlob = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob);
+    const a   = document.createElement("a");
+    a.href     = url;
+    a.download = filename;
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    // Nettoyer après un court délai pour laisser le temps au navigateur
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 200);
+  };
+
+  /** Extrait le message d'erreur d'une réponse blob (JSON encapsulé dans blob) */
+  const blobErrorMessage = async (blobData: Blob): Promise<string> => {
+    try {
+      const text = await blobData.text();
+      const json = JSON.parse(text);
+      return json.detail ?? json.message ?? "Erreur serveur";
+    } catch {
+      return "Erreur lors de la génération du PDF";
+    }
+  };
+
   const handleGeneratePdf = async () => {
     if (!selectedId) { toast.error("Sélectionnez un dataset"); return; }
     setIsPdfGenerating(true);
     try {
-      const response = await api.post(`/reports/${selectedId}/export/pdf`, {}, { responseType: "blob" });
-      const blob = new Blob([response.data], { type: "application/pdf" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      const safeName = (selectedName || "dataset").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-      a.href = url;
-      a.download = `rapport-${safeName || "dataset"}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast.success("Rapport PDF généré");
-    } catch {
-      toast.error("Impossible de générer le PDF");
+      const response = await api.post(
+        `/reports/${selectedId}/export/pdf`,
+        {},
+        { responseType: "blob" }
+      );
+
+      // Vérifier que c'est bien un PDF et non une erreur JSON
+      const contentType = response.headers?.["content-type"] ?? "";
+      if (!contentType.includes("pdf")) {
+        const msg = await blobErrorMessage(response.data as Blob);
+        toast.error(msg);
+        return;
+      }
+
+      const safeName = (selectedName || "dataset")
+        .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      downloadBlob(
+        new Blob([response.data], { type: "application/pdf" }),
+        `rapport-${safeName || "dataset"}.pdf`
+      );
+      toast.success("✅ Rapport PDF téléchargé !");
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: Blob } };
+      if (axiosErr?.response?.data instanceof Blob) {
+        const msg = await blobErrorMessage(axiosErr.response.data);
+        toast.error(msg);
+      } else {
+        toast.error("Impossible de générer le PDF — vérifiez votre connexion");
+      }
     } finally {
       setIsPdfGenerating(false);
     }
@@ -162,17 +206,32 @@ export default function RapportsPage() {
     setIsPrixPdf(true);
     try {
       const params = new URLSearchParams({ country: prixCountry, months: String(prixMonths) });
-      const response = await api.post(`/reports/prix/pdf?${params}`, {}, { responseType: "blob" });
-      const blob = new Blob([response.data], { type: "application/pdf" });
-      const url  = URL.createObjectURL(blob);
-      const a    = document.createElement("a");
-      a.href = url;
-      a.download = `prix-alimentaires-${prixCountry.toLowerCase()}-${new Date().toISOString().slice(0, 10)}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast.success("Rapport des prix téléchargé !");
-    } catch {
-      toast.error("Impossible de générer le rapport des prix");
+      const response = await api.post(
+        `/reports/prix/pdf?${params}`,
+        {},
+        { responseType: "blob" }
+      );
+
+      const contentType = response.headers?.["content-type"] ?? "";
+      if (!contentType.includes("pdf")) {
+        const msg = await blobErrorMessage(response.data as Blob);
+        toast.error(msg);
+        return;
+      }
+
+      downloadBlob(
+        new Blob([response.data], { type: "application/pdf" }),
+        `prix-alimentaires-${prixCountry.toLowerCase()}-${new Date().toISOString().slice(0, 10)}.pdf`
+      );
+      toast.success("✅ Rapport des prix téléchargé !");
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: Blob } };
+      if (axiosErr?.response?.data instanceof Blob) {
+        const msg = await blobErrorMessage(axiosErr.response.data);
+        toast.error(msg);
+      } else {
+        toast.error("Impossible de générer le rapport des prix");
+      }
     } finally {
       setIsPrixPdf(false);
     }

@@ -79,28 +79,39 @@ export default function DashboardCartePage() {
   const selectedData = selectedRegion ? regionPrices.find((p) => p.region === selectedRegion) : null;
 
   return (
-    <div className="p-6 lg:p-8 h-full">
+    <div className="p-3 sm:p-6 lg:p-8 h-full">
 
       {/* En-tête */}
-      <div className="flex items-center justify-between gap-4 mb-5 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Cartographie des prix</h1>
-          <p className="text-gray-500 text-sm mt-0.5">
+      <div className="flex items-center justify-between gap-3 mb-4 sm:mb-5">
+        <div className="min-w-0">
+          <h1 className="text-lg sm:text-2xl font-bold text-gray-900">Cartographie des prix</h1>
+          <p className="text-gray-500 text-xs sm:text-sm mt-0.5 hidden sm:block">
             Données WFP / SONAGESS · Burkina Faso · 13 régions
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <button onClick={() => refetch()}
-            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
-            <RefreshCw className="w-4 h-4" />
-          </button>
-        </div>
+        <button onClick={() => refetch()}
+          className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors shrink-0">
+          <RefreshCw className="w-4 h-4" />
+        </button>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-5 h-[calc(100vh-200px)] min-h-[600px]">
+      {/* Sélecteur produit — horizontal scroll sur mobile */}
+      <div className="flex gap-2 overflow-x-auto pb-2 mb-4 lg:hidden no-scrollbar">
+        {COMMODITIES.map((c) => (
+          <button key={c.key}
+            onClick={() => { setCommodity(c.key); setSelectedRegion(null); }}
+            className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap shrink-0 transition-colors",
+              commodity === c.key ? "text-white" : "bg-gray-100 text-gray-600")}
+            style={commodity === c.key ? { background: c.color } : {}}>
+            {c.label}
+          </button>
+        ))}
+      </div>
 
-        {/* ── Panneau gauche ── */}
-        <div className="w-full lg:w-64 shrink-0 space-y-4 overflow-y-auto">
+      <div className="flex flex-col lg:flex-row gap-4 lg:gap-5" style={{ minHeight: "min(calc(100vh - 220px), 700px)" }}>
+
+        {/* ── Panneau gauche — masqué sur mobile (intégré ci-dessus) ── */}
+        <div className="hidden lg:block w-64 shrink-0 space-y-4 overflow-y-auto">
 
           {/* Sélecteur produit */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">

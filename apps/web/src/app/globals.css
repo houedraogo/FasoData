@@ -78,3 +78,30 @@
   @apply rounded-xl;
   font-family: inherit;
 }
+
+/* ── Utilitaires responsive ──────────────────────────────────────────────── */
+
+/* Masquer la scrollbar tout en gardant le scroll (mobile horizontal) */
+.no-scrollbar {
+  scrollbar-width: none;        /* Firefox */
+  -ms-overflow-style: none;     /* IE/Edge */
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;                /* Chrome/Safari */
+}
+
+/* Safe area bottom (iOS notch / Android navigation bar) */
+.safe-area-pb {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Touch tap highlight supprimé sur iOS */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Améliore le scroll sur iOS */
+.overflow-y-auto,
+.overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+}

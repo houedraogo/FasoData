@@ -184,26 +184,26 @@ export default function ImportPage() {
   const isBusy = jobStatus === "uploading" || jobStatus === "processing";
 
   return (
-    <div className="p-6 lg:p-8 max-w-3xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-3xl mx-auto">
 
       {/* En-tête */}
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex items-center gap-3 mb-5 sm:mb-6">
         <Link href="/dashboard/datasets"
-          className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">
+          className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-colors shrink-0">
           <ArrowLeft className="w-4 h-4" />
         </Link>
-        <div>
-          <h1 className="text-2xl font-bold text-[#1A2C42]">Importer des données</h1>
-          <p className="text-gray-500 text-sm mt-0.5">Formats acceptés : CSV, XLSX · max 50 Mo</p>
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl font-bold text-[#1A2C42]">Importer des données</h1>
+          <p className="text-gray-500 text-xs sm:text-sm mt-0.5">CSV, XLSX · max 50 Mo</p>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 sm:space-y-6">
 
         {/* ── Zone de dépôt ── */}
         <div
           {...getRootProps()}
-          className={`border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all ${
+          className={`border-2 border-dashed rounded-2xl p-6 sm:p-10 text-center cursor-pointer transition-all ${
             isBusy ? "opacity-50 pointer-events-none" :
             isDragActive ? "border-[#E04E2F] bg-[#E04E2F]/5 scale-[1.01]" :
             file ? "border-green-400 bg-green-50" :

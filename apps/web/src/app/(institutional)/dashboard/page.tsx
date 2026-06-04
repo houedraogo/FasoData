@@ -688,9 +688,9 @@ export default function DashboardPage() {
       )}
 
       {/* En-tête */}
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <div className="flex items-center gap-3 mb-1">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
             {hasPrograms ? (
               <span className="text-xs font-semibold text-white bg-[#1A2C42] px-3 py-1 rounded-full">
                 {programmesData.length} programme{programmesData.length > 1 ? "s" : ""} actif{programmesData.length > 1 ? "s" : ""}
@@ -701,32 +701,37 @@ export default function DashboardPage() {
               </span>
             )}
             <span className="text-xs text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-              Période : {overview?.period ?? "30 derniers jours"}
+              {overview?.period ?? "30 derniers jours"}
             </span>
           </div>
-          <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 mt-3">
-            Bonjour {firstName}. {hasPrograms ? "Voici le pouls de vos programmes." : "Voici votre veille FasoData."}
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mt-2 leading-tight">
+            Bonjour {firstName}.{" "}
+            <span className="hidden sm:inline">
+              {hasPrograms ? "Voici le pouls de vos programmes." : "Voici votre veille FasoData."}
+            </span>
           </h1>
           {!hasPrograms && (
-            <p className="text-gray-400 text-sm mt-1">
+            <p className="text-gray-400 text-sm mt-1 hidden sm:block">
               {preferences
-                ? "Les indicateurs ci-dessous privilégient vos domaines d’intérêt et les données ouvertes disponibles."
-                : "Répondez aux questions de démarrage pour orienter les données affichées dans votre dashboard."}
+                ? "Les indicateurs ci-dessous privilégient vos domaines d’intérêt."
+                : "Répondez aux questions de démarrage pour orienter votre dashboard."}
             </p>
           )}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Export masqué sur mobile pour gagner de la place */}
           <button
             onClick={handleExportRapport}
-            className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors bg-white">
+            className="hidden sm:flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors bg-white">
             <Download className="w-4 h-4" />
-            Exporter rapport
+            <span className="hidden lg:inline">Exporter rapport</span>
           </button>
           <button
             onClick={() => setShowNouveauProg(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[#1A2C42] hover:bg-[#0f1e30] text-white rounded-xl text-sm font-semibold transition-colors">
+            className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-[#1A2C42] hover:bg-[#0f1e30] text-white rounded-xl text-sm font-semibold transition-colors">
             <Plus className="w-4 h-4" />
-            Nouveau programme
+            <span className="hidden xs:inline">Nouveau programme</span>
+            <span className="xs:hidden">Nouveau</span>
           </button>
         </div>
       </div>

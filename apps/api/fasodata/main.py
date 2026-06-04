@@ -1,9 +1,9 @@
 import logging
 import os
+import subprocess
+import sys
 from contextlib import asynccontextmanager
 
-from alembic import command as alembic_command
-from alembic.config import Config as AlembicConfig
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
@@ -20,28 +20,41 @@ from fasodata.reports.router import router as reports_router
 from fasodata.search.router import router as search_router
 from fasodata.users.router import router as users_router
 
-logger = logging.getLogger(__name__)
+logger   = logging.getLogger(__name__)
 settings = get_settings()
 
 
 def _run_migrations() -> None:
-    """Applique les migrations Alembic (upgrade head) au démarrage."""
-    alembic_ini = os.path.join(os.path.dirname(__file__), "..", "alembic.ini")
-    alembic_ini = os.path.abspath(alembic_ini)
-    cfg = AlembicConfig(alembic_ini)
-    # Override de l'URL depuis l'env (identique à env.py)
-    cfg.set_main_option("sqlalchemy.url", settings.database_url)
-    try:
-        alembic_command.upgrade(cfg, "head")
-        logger.info("✅ Migrations Alembic appliquées avec succès")
-    except Exception as exc:
-        logger.error(f"❌ Erreur migration Alembic : {exc}")
-        raise
+    """
+    Applique les migrations Alembic via subprocess.
+
+    On utilise subprocess (et non alembic_command.upgrade()) car
+    env.py utilise asyncio.run() — incompatible avec la boucle asyncio
+    déjà active dans le lifespan FastAPI.
+    """
+    alembic_ini = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "..", "alembic.ini")
+    )
+    result = subprocess.run(
+        [sys.executable, "-m", "alembic", "-c", alembic_ini, "upgrade", "head"],
+        capture_output=True,
+        text=True,
+        cwd=os.path.dirname(alembic_ini),   # /app
+    )
+    if result.stdout:
+        logger.info(result.stdout.strip())
+    if result.stderr:
+        logger.warning(result.stderr.strip())
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"Alembic migration échouée (exit {result.returncode})"
+        )
+    logger.info("✅ Migrations Alembic appliquées avec succès")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Lancer les migrations Alembic (idempotentes — IF NOT EXISTS dans 0001)
+    # Migrations Alembic — subprocess pour éviter le conflit asyncio
     _run_migrations()
     # Initialiser Africa's Talking SMS
     at_service.initialize(settings.at_username, settings.at_api_key)

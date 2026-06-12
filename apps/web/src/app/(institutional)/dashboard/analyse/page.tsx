@@ -11,7 +11,7 @@ import {
 } from "recharts";
 import {
   BarChart3, Eye, Download, Database, TrendingUp,
-  ChevronDown, Layers, FileText, Info,
+  ChevronDown, Layers, FileText, Info, AlertTriangle, RefreshCw,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
@@ -28,54 +28,23 @@ const INDIGO = "#4F46E5";
 const ROSE   = "#E11D48";
 
 const CATEGORY_COLORS: Record<string, string> = {
-  Agriculture:    GREEN,
-  Santé:         RED,
-  Éducation:     INDIGO,
-  Économie:      GOLD,
-  Environnement: TEAL,
-  Géographie:    NAVY,
+  "Agriculture":    GREEN,
+  "Sante":          RED,
+  "Education":      INDIGO,
+  "Economie":       GOLD,
+  "Environnement":  TEAL,
+  "Geographie":     NAVY,
   default:       "#94A3B8",
 };
 
 const PIE_COLORS = [NAVY, RED, GOLD, GREEN, TEAL, INDIGO, ROSE, "#F59E0B"];
 
 const TYPE_COLORS: Record<string, string> = {
-  Entier: NAVY, Décimal: TEAL, Texte: GREEN,
-  Date: GOLD, Horodatage: INDIGO, Booléen: RED,
+  "Entier": NAVY, "Decimal": TEAL, "Texte": GREEN,
+  "Date": GOLD, "Horodatage": INDIGO, "Booleen": RED,
 };
 
-// ── Génère des données mensuelles simulées ────────────────────────────────────
-
-const MONTHS = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun",
-                "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"];
-
-function generateMonthly(
-  views: number,
-  downloads: number,
-  seed: number,
-  months = 7
-) {
-  // Distribution pseudo-aléatoire basée sur seed
-  const weights = Array.from({ length: months }, (_, i) => {
-    const noise = Math.abs(Math.sin((seed + i) * 37.7) * 0.4 + 0.6);
-    return noise * (0.5 + i * 0.08); // légère tendance hausse
-  });
-  const sumW = weights.reduce((a, b) => a + b, 0);
-  const now = new Date();
-
-  return weights.map((w, i) => {
-    const d = new Date(now);
-    d.setMonth(d.getMonth() - (months - 1 - i));
-    return {
-      month: MONTHS[d.getMonth()],
-      vues:          Math.round((views    * w) / sumW),
-      téléchargements: Math.round((downloads * w) / sumW),
-    };
-  });
-}
-
-// ── Tooltip custom ────────────────────────────────────────────────────────────
-
+// Tooltip custom
 const CustomTooltip = ({
   active, payload, label,
 }: {
@@ -168,7 +137,7 @@ export default function AnalysePage() {
   const [selectedSlug, setSelectedSlug] = useState<string>("");
 
   // ── 1. Tous les datasets (publics) ────────────────────────────────────────
-  const { data: allData, isLoading: allLoading } = useQuery({
+  const { data: allData, isLoading: allLoading, isError: allError, isFetching: allFetching, refetch: refetchAll } = useQuery({
     queryKey: ["analyse-datasets"],
     queryFn: async () => {
       const { data } = await api.get("/datasets?page_size=50&status=published");
@@ -177,7 +146,7 @@ export default function AnalysePage() {
   });
 
   // ── 2. Stats du dataset sélectionné ───────────────────────────────────────
-  const { data: selectedStats, isLoading: statsLoading } = useQuery({
+  const { data: selectedStats, isLoading: statsLoading, isError: statsError, isFetching: statsFetching, refetch: refetchStats } = useQuery({
     queryKey: ["analyse-stats", selectedSlug],
     queryFn: async () => {
       const { data } = await api.get(`/datasets/${selectedSlug}/stats`);
@@ -210,7 +179,7 @@ export default function AnalysePage() {
           fullName: d.name,
           slug: d.slug,
           vues: d.view_count,
-          téléchargements: d.download_count,
+          telechargements: d.download_count,
         })),
     [datasets]
   );
@@ -235,25 +204,14 @@ export default function AnalysePage() {
     return Object.entries(counts).map(([format, count]) => ({ format, count }));
   }, [datasets]);
 
-  // Tendance mensuelle globale simulée
-  const trendData = useMemo(
-    () => generateMonthly(totalViews, totalDownloads, datasets.length, 7),
-    [totalViews, totalDownloads, datasets.length]
-  );
+  // Historique mensuel branche sur donnees reelles uniquement.
+  const trendData: { month: string; vues: number; telechargements: number }[] = [];
 
   // Dataset sélectionné (objet complet)
   const selectedDataset = datasets.find((d) => d.slug === selectedSlug);
 
   // Tendance mensuelle du dataset sélectionné
-  const selectedTrend = useMemo(() => {
-    if (!selectedDataset) return [];
-    return generateMonthly(
-      selectedDataset.view_count,
-      selectedDataset.download_count,
-      selectedDataset.slug.charCodeAt(0),
-      7
-    );
-  }, [selectedDataset]);
+  const selectedTrend: { month: string; vues: number; telechargements: number }[] = [];
 
   // Complétude des colonnes
   const columnCompleteness = useMemo(() => {
@@ -262,7 +220,7 @@ export default function AnalysePage() {
       name: col.name.length > 16 ? col.name.slice(0, 14) + "…" : col.name,
       fullName: col.name,
       type: typeLabel(col.type),
-      complétude: selectedStats.row_count && col.null_count != null
+      completude: selectedStats.row_count && col.null_count != null
         ? Math.round(((selectedStats.row_count - col.null_count) / selectedStats.row_count) * 100)
         : 100,
     }));
@@ -288,10 +246,29 @@ export default function AnalysePage() {
         <div>
           <h1 className="text-2xl font-bold text-faso-navy">Analyse des données</h1>
           <p className="text-gray-500 text-sm mt-1">
-            Vue d'ensemble des {datasets.length} dataset(s) publiés
+            {allError ? "Données analytiques indisponibles" : `Vue d'ensemble des ${datasets.length} dataset(s) publiés`}
           </p>
         </div>
       </div>
+
+      {allError && (
+        <div className="rounded-2xl border border-amber-100 bg-amber-50 px-5 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
+            <div>
+              <p className="text-sm font-semibold text-amber-900">Impossible de charger les données d'analyse</p>
+              <p className="mt-0.5 text-xs text-amber-700">Les graphiques seront disponibles dès que l'API datasets répondra.</p>
+            </div>
+          </div>
+          <button
+            onClick={() => refetchAll()}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-2 text-xs font-semibold text-amber-700 shadow-sm ring-1 ring-amber-100 hover:bg-amber-50"
+          >
+            <RefreshCw className={cn("h-3.5 w-3.5", allFetching && "animate-spin")} />
+            Réessayer
+          </button>
+        </div>
+      )}
 
       {/* ── Section 1 : KPIs globaux ────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -321,7 +298,7 @@ export default function AnalysePage() {
           <SectionTitle icon={TrendingUp} title="Tendance mensuelle — 7 derniers mois" sub="Vues et téléchargements cumulés de la plateforme" />
           {allLoading ? (
             <ChartSkeleton height={200} />
-          ) : (
+          ) : trendData.length ? (
             <ResponsiveContainer width="100%" height={200}>
               <AreaChart data={trendData} margin={{ top: 4, right: 10, left: -20, bottom: 0 }}>
                 <defs>
@@ -340,9 +317,17 @@ export default function AnalysePage() {
                 <Tooltip content={<CustomTooltip />} />
                 <Legend wrapperStyle={{ fontSize: 12, paddingTop: 12 }} />
                 <Area type="monotone" dataKey="vues"            stroke={NAVY} strokeWidth={2} fill="url(#gVues)" dot={false} activeDot={{ r: 4 }} />
-                <Area type="monotone" dataKey="téléchargements" stroke={RED}  strokeWidth={2} fill="url(#gDl)"   dot={false} activeDot={{ r: 4 }} />
+                <Area type="monotone" dataKey="telechargements" stroke={RED}  strokeWidth={2} fill="url(#gDl)"   dot={false} activeDot={{ r: 4 }} />
               </AreaChart>
             </ResponsiveContainer>
+          ) : (
+            <div className="flex h-[200px] flex-col items-center justify-center rounded-2xl border border-dashed border-gray-200 text-center">
+              <TrendingUp className="mb-2 h-8 w-8 text-gray-300" />
+              <p className="text-sm font-semibold text-gray-600">Historique de consultation non disponible</p>
+              <p className="mt-1 max-w-sm text-xs text-gray-400">
+                Cette courbe sera branchée quand l'API exposera les vues et téléchargements par mois.
+              </p>
+            </div>
           )}
         </div>
 
@@ -412,7 +397,7 @@ export default function AnalysePage() {
                 <Tooltip content={<CustomTooltip />} />
                 <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
                 <Bar dataKey="vues"            fill={NAVY} radius={[0, 4, 4, 0]} barSize={10} />
-                <Bar dataKey="téléchargements" fill={RED}  radius={[0, 4, 4, 0]} barSize={10} />
+                <Bar dataKey="telechargements" fill={RED}  radius={[0, 4, 4, 0]} barSize={10} />
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -457,10 +442,10 @@ export default function AnalysePage() {
 
       {/* ── Section 4 : Analyse par dataset ────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
           <SectionTitle icon={BarChart3} title="Analyse détaillée d'un dataset" sub="Sélectionnez un dataset pour voir ses statistiques de colonnes" />
           {/* Sélecteur */}
-          <div className="relative min-w-[260px]">
+          <div className="relative w-full sm:w-auto sm:min-w-[260px]">
             <select
               value={selectedSlug}
               onChange={(e) => setSelectedSlug(e.target.value)}
@@ -488,6 +473,19 @@ export default function AnalysePage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <ChartSkeleton height={220} />
             <ChartSkeleton height={220} />
+          </div>
+        ) : statsError ? (
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-200 py-12 text-center text-gray-400">
+            <AlertTriangle className="w-8 h-8 mb-2 text-amber-300" />
+            <p className="text-sm font-semibold text-gray-600">Statistiques indisponibles</p>
+            <p className="text-xs text-gray-400 mt-1">Impossible de charger les statistiques de ce dataset.</p>
+            <button
+              onClick={() => refetchStats()}
+              className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#1A2C42] px-4 py-2 text-xs font-semibold text-white hover:bg-[#223a57]"
+            >
+              <RefreshCw className={cn("h-3.5 w-3.5", statsFetching && "animate-spin")} />
+              Réessayer
+            </button>
           </div>
         ) : !selectedStats ? (
           <div className="flex flex-col items-center justify-center py-12 text-gray-300">
@@ -528,7 +526,7 @@ export default function AnalysePage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
               {/* Tendance dataset */}
-              {selectedDataset && (
+              {selectedDataset && selectedTrend.length > 0 && (
                 <div>
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
                     Tendance — {selectedDataset.name}
@@ -551,7 +549,7 @@ export default function AnalysePage() {
                       <Tooltip content={<CustomTooltip />} />
                       <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
                       <Area type="monotone" dataKey="vues"            stroke={NAVY}  strokeWidth={2} fill="url(#gSV)" dot={false} activeDot={{ r: 4 }} />
-                      <Area type="monotone" dataKey="téléchargements" stroke={GREEN} strokeWidth={2} fill="url(#gSD)" dot={false} activeDot={{ r: 4 }} />
+                      <Area type="monotone" dataKey="telechargements" stroke={GREEN} strokeWidth={2} fill="url(#gSD)" dot={false} activeDot={{ r: 4 }} />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
@@ -604,11 +602,11 @@ export default function AnalysePage() {
                         props.payload.fullName,
                       ]}
                     />
-                    <Bar dataKey="complétude" radius={[0, 4, 4, 0]} barSize={14}>
-                      {columnCompleteness.map((item: { name: string; fullName: string; type: string; complétude: number }) => (
+                    <Bar dataKey="completude" radius={[0, 4, 4, 0]} barSize={14}>
+                      {columnCompleteness.map((item: { name: string; fullName: string; type: string; completude: number }) => (
                         <Cell
                           key={item.name}
-                          fill={item.complétude === 100 ? GREEN : item.complétude >= 90 ? TEAL : item.complétude >= 70 ? GOLD : RED}
+                          fill={item.completude === 100 ? GREEN : item.completude >= 90 ? TEAL : item.completude >= 70 ? GOLD : RED}
                         />
                       ))}
                     </Bar>

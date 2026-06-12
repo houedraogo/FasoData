@@ -1,7 +1,5 @@
 """Configuration des tests FasoData — PostgreSQL fasodata_test."""
 
-import asyncio
-import pytest
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
@@ -16,14 +14,14 @@ from fasodata.users.models import User, UserRole
 TEST_DB_URL = "postgresql+asyncpg://fasodata:changeme_db@db:5432/fasodata_test"
 
 
+async def _reset_public_schema(conn) -> None:
+    await conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE"))
+    await conn.execute(text("CREATE SCHEMA public"))
+    await conn.execute(text("GRANT ALL ON SCHEMA public TO fasodata"))
+    await conn.execute(text("GRANT ALL ON SCHEMA public TO public"))
+
+
 # ── Event loop session-scoped ─────────────────────────────────────────────────
-
-@pytest.fixture(scope="session")
-def event_loop():
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
-
 
 # ── Moteur + schéma ───────────────────────────────────────────────────────────
 
@@ -33,14 +31,14 @@ async def test_engine():
 
     # Créer toutes les tables
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
+        await _reset_public_schema(conn)
         await conn.run_sync(Base.metadata.create_all)
 
     yield engine
 
     # Nettoyer à la fin de la session
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
+        await _reset_public_schema(conn)
 
     await engine.dispose()
 

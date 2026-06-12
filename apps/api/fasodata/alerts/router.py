@@ -116,7 +116,7 @@ async def confirm_subscription(token: str, db: AsyncSession = Depends(get_db)):
     await db.flush()
 
     commodity_labels = {
-        "sorghum": "Sorgho", "rice_local": "Riz local",
+        "sorghum": "Sorgho", "rice_local": "Riz local", "rice_imported": "Riz importé",
         "maize": "Maïs", "millet": "Mil",
         "cowpea": "Niébé", "groundnut": "Arachide",
     }

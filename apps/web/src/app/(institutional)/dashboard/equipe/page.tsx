@@ -10,6 +10,7 @@ import {
 import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
+import { FocusTrap } from "@/components/ui/FocusTrap";
 import toast from "react-hot-toast";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -186,7 +187,8 @@ export default function EquipePage() {
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => refetch()}
-            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            aria-label="Actualiser la liste des membres">
             <RefreshCw className="w-4 h-4" />
           </button>
           <button onClick={() => setShowInvite(true)}
@@ -199,8 +201,9 @@ export default function EquipePage() {
 
       {/* Recherche */}
       <div className="relative max-w-sm">
+        <label htmlFor="team-search" className="sr-only">Chercher un membre</label>
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-        <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+        <input id="team-search" type="text" value={search} onChange={(e) => setSearch(e.target.value)}
           placeholder="Chercher un membre…"
           className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#E04E2F]/20 bg-white" />
       </div>
@@ -265,12 +268,14 @@ export default function EquipePage() {
                         <button
                           onClick={() => updateStatusMutation.mutate({ id: member.id, status: "active" })}
                           title="Marquer comme actif"
+                          aria-label={`Marquer ${member.email} comme actif`}
                           className="p-1.5 text-gray-400 hover:text-[#16A34A] hover:bg-green-50 rounded-lg transition-colors">
                           <CheckCircle2 className="w-3.5 h-3.5" />
                         </button>
                       )}
                       <button
                         onClick={() => { if (confirm(`Retirer ${member.email} de l'équipe ?`)) deleteMutation.mutate(member.id); }}
+                        aria-label={`Retirer ${member.email} de l'équipe`}
                         className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -316,15 +321,16 @@ export default function EquipePage() {
       {/* Modal invitation */}
       {showInvite && (
         <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowInvite(false)} />
-          <div className="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-lg">
+          <button type="button" className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowInvite(false)} aria-label="Fermer la modale" />
+          <FocusTrap onEscape={() => setShowInvite(false)} labelledBy="invite-member-modal-title" describedBy="invite-member-modal-description" className="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-lg">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
               <div>
-                <h2 className="font-bold text-gray-900">Inviter un membre</h2>
-                <p className="text-xs text-gray-400 mt-0.5">Un email d'invitation sera envoyé automatiquement</p>
+                <h2 id="invite-member-modal-title" className="font-bold text-gray-900">Inviter un membre</h2>
+                <p id="invite-member-modal-description" className="text-xs text-gray-400 mt-0.5">Un email d'invitation sera envoyé automatiquement</p>
               </div>
-              <button onClick={() => setShowInvite(false)}
-                className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg">
+              <button type="button" onClick={() => setShowInvite(false)}
+                className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg"
+                aria-label="Fermer">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -333,12 +339,12 @@ export default function EquipePage() {
 
               {/* Email */}
               <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
+                <label htmlFor="invite-email" className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
                   Email <span className="text-[#E04E2F]">*</span>
                 </label>
                 <div className="relative">
                   <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
-                  <input type="email" value={form.email}
+                  <input id="invite-email" type="email" value={form.email}
                     onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
                     placeholder="collaborateur@organisation.bf"
                     className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1A2C42]/20" />
@@ -347,10 +353,10 @@ export default function EquipePage() {
 
               {/* Nom */}
               <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
+                <label htmlFor="invite-full-name" className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
                   Nom complet <span className="text-gray-300">(optionnel)</span>
                 </label>
-                <input type="text" value={form.full_name}
+                <input id="invite-full-name" type="text" value={form.full_name}
                   onChange={(e) => setForm((p) => ({ ...p, full_name: e.target.value }))}
                   placeholder="Prénom Nom"
                   className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1A2C42]/20" />
@@ -359,11 +365,11 @@ export default function EquipePage() {
               <div className="grid grid-cols-2 gap-4">
                 {/* Rôle */}
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
+                  <label htmlFor="invite-role" className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
                     Rôle <span className="text-[#E04E2F]">*</span>
                   </label>
                   <div className="relative">
-                    <select value={form.role}
+                    <select id="invite-role" value={form.role}
                       onChange={(e) => setForm((p) => ({ ...p, role: e.target.value }))}
                       className="w-full appearance-none px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1A2C42]/20">
                       {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
@@ -374,13 +380,14 @@ export default function EquipePage() {
 
                 {/* Niveau d'accès */}
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
+                  <span id="invite-access-label" className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
                     Accès
-                  </label>
-                  <div className="flex gap-1">
+                  </span>
+                  <div className="flex gap-1" role="group" aria-labelledby="invite-access-label">
                     {ACCESS_LEVELS.map((lvl) => (
                       <button key={lvl} type="button"
                         onClick={() => setForm((p) => ({ ...p, access_level: lvl }))}
+                        aria-pressed={form.access_level === lvl}
                         className={cn("flex-1 py-2 rounded-xl text-[11px] font-semibold border transition-colors",
                           form.access_level === lvl
                             ? "bg-[#1A2C42] text-white border-[#1A2C42]"
@@ -394,10 +401,10 @@ export default function EquipePage() {
 
               {/* Organisation */}
               <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
+                <label htmlFor="invite-organization" className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
                   Organisation
                 </label>
-                <input type="text" value={form.organization}
+                <input id="invite-organization" type="text" value={form.organization}
                   onChange={(e) => setForm((p) => ({ ...p, organization: e.target.value }))}
                   placeholder={user?.organization ?? "FasoData"}
                   className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1A2C42]/20" />
@@ -413,11 +420,11 @@ export default function EquipePage() {
               </div>
 
               <div className="flex gap-3 justify-end pt-1">
-                <button onClick={() => setShowInvite(false)}
+                <button type="button" onClick={() => setShowInvite(false)}
                   className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50">
                   Annuler
                 </button>
-                <button onClick={handleInvite}
+                <button type="button" onClick={handleInvite}
                   disabled={inviteMutation.isPending}
                   className="flex items-center gap-2 px-4 py-2.5 bg-[#E04E2F] hover:bg-[#c73e22] disabled:opacity-60 text-white rounded-xl text-sm font-semibold transition-colors">
                   {inviteMutation.isPending
@@ -426,7 +433,7 @@ export default function EquipePage() {
                 </button>
               </div>
             </div>
-          </div>
+          </FocusTrap>
         </div>
       )}
     </div>

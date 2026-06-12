@@ -1,4 +1,5 @@
 import axios from "axios";
+import { clearAuthTokens, getAccessToken, getRefreshToken, setAuthTokens } from "@/lib/auth-storage";
 
 export const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || "/api",
@@ -8,7 +9,7 @@ export const api = axios.create({
 // ── Injecte le token JWT à chaque requête ─────────────────────────────────────
 api.interceptors.request.use((config) => {
   if (typeof window !== "undefined") {
-    const token = localStorage.getItem("access_token");
+    const token = getAccessToken();
     if (token) config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
@@ -29,9 +30,7 @@ api.interceptors.response.use(
     ) {
       original._retry = true;
 
-      const refreshToken = typeof window !== "undefined"
-        ? localStorage.getItem("refresh_token")
-        : null;
+      const refreshToken = getRefreshToken();
 
       if (refreshToken) {
         try {
@@ -41,15 +40,12 @@ api.interceptors.response.use(
             { refresh_token: refreshToken },
             { headers: { "Content-Type": "application/json" } }
           );
-          localStorage.setItem("access_token", data.access_token);
-          localStorage.setItem("refresh_token", data.refresh_token);
+          setAuthTokens(data.access_token, data.refresh_token);
           original.headers.Authorization = `Bearer ${data.access_token}`;
           return api.request(original);
         } catch {
-          // Refresh échoué → supprimer les tokens périmés, ne PAS rediriger ici
-          // (laisser le composant appelant gérer l'erreur proprement)
-          localStorage.removeItem("access_token");
-          localStorage.removeItem("refresh_token");
+          clearAuthTokens();
+          window.dispatchEvent(new Event("fasodata:auth-expired"));
         }
       }
     }

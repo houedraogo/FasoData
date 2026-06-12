@@ -24,11 +24,19 @@ database_url = os.getenv("DATABASE_URL", "postgresql+asyncpg://fasodata:changeme
 config.set_main_option("sqlalchemy.url", database_url)
 
 
+def include_object(object_, name, type_, reflected, compare_to):
+    """Ignore extension/external tables when running Alembic autogenerate checks."""
+    if type_ == "table" and reflected and compare_to is None:
+        return False
+    return True
+
+
 def run_migrations_offline():
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
         target_metadata=target_metadata,
+        include_object=include_object,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
     )
@@ -37,7 +45,11 @@ def run_migrations_offline():
 
 
 def do_run_migrations(connection):
-    context.configure(connection=connection, target_metadata=target_metadata)
+    context.configure(
+        connection=connection,
+        target_metadata=target_metadata,
+        include_object=include_object,
+    )
     with context.begin_transaction():
         context.run_migrations()
 

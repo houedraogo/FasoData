@@ -8,6 +8,7 @@ import {
   Bell, Users, Settings, LogOut, Search, ChevronRight,
   ShieldCheck, X, Menu,
 } from "lucide-react";
+import { AuthGate } from "@/components/auth/AuthGate";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 
@@ -77,6 +78,7 @@ export default function InstitutionalLayout({ children }: { children: React.Reac
   const quotaPct    = Math.round((QUOTA_USED / QUOTA_TOTAL) * 100);
 
   return (
+    <AuthGate allowedRoles={["institutional"]}>
     <div className="min-h-screen flex bg-[#F8F9FB]">
 
       {/* ── Sidebar desktop (lg+) ─────────────────────────────────────────── */}
@@ -254,21 +256,24 @@ export default function InstitutionalLayout({ children }: { children: React.Reac
             />
           </div>
 
-          {/* FR / EN — masqué sur petits écrans */}
-          <div className="text-xs text-gray-400 hidden sm:flex items-center gap-1 shrink-0">
-            <span className="font-semibold text-gray-800">FR</span>
-            <span>/</span>
-            <span className="cursor-pointer hover:text-gray-600">EN</span>
+          <div
+            className="hidden sm:flex items-center rounded-lg border border-gray-100 bg-gray-50 px-2.5 py-1.5 text-[11px] font-semibold text-gray-500 shrink-0"
+            title="L'espace privé FasoData est disponible en français pour cette version."
+          >
+            FR
           </div>
 
           {/* Notifications */}
-          <button className="relative w-9 h-9 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-colors shrink-0">
+          <button
+            className="relative w-9 h-9 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-colors shrink-0"
+            aria-label="Afficher les notifications"
+          >
             <Bell className="w-4 h-4" />
             <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-[#E04E2F] rounded-full" />
           </button>
 
           {/* Avatar */}
-          <button className="flex items-center gap-2 shrink-0">
+          <button className="flex items-center gap-2 shrink-0" aria-label="Ouvrir le menu utilisateur">
             <div className="w-8 h-8 rounded-full bg-[#16A34A] flex items-center justify-center text-white text-xs font-bold">
               {initials}
             </div>
@@ -311,6 +316,7 @@ export default function InstitutionalLayout({ children }: { children: React.Reac
           <button
             onClick={() => setDrawerOpen(true)}
             className="flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] font-semibold text-gray-400 hover:text-gray-600 transition-colors"
+            aria-label="Ouvrir les autres rubriques"
           >
             <Menu className="w-5 h-5" />
             Plus
@@ -318,5 +324,6 @@ export default function InstitutionalLayout({ children }: { children: React.Reac
         </div>
       </nav>
     </div>
+    </AuthGate>
   );
 }

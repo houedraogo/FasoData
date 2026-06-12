@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { api } from "@/lib/api";
+import { clearAuthTokens, getAccessToken, getRefreshToken, setAuthTokens } from "@/lib/auth-storage";
 
 interface User {
   id: string;
@@ -15,6 +16,8 @@ interface User {
 interface AuthStore {
   user: User | null;
   isLoading: boolean;
+  status: "idle" | "checking" | "authenticated" | "anonymous";
+  initialize: () => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   fetchMe: () => Promise<void>;
@@ -23,9 +26,28 @@ interface AuthStore {
 export const useAuth = create<AuthStore>((set) => ({
   user: null,
   isLoading: false,
+  status: "idle",
+
+  initialize: async () => {
+    if (!getAccessToken()) {
+      clearAuthTokens();
+      set({ user: null, status: "anonymous", isLoading: false });
+      return;
+    }
+
+    set({ status: "checking", isLoading: true });
+    try {
+      const { data } = await api.get("/auth/me");
+      setAuthTokens(getAccessToken() ?? "", getRefreshToken() ?? "", data.role);
+      set({ user: data, status: "authenticated", isLoading: false });
+    } catch {
+      clearAuthTokens();
+      set({ user: null, status: "anonymous", isLoading: false });
+    }
+  },
 
   login: async (email: string, password: string) => {
-    set({ isLoading: true });
+    set({ isLoading: true, status: "checking" });
     const form = new URLSearchParams();
     form.append("username", email);
     form.append("password", password);
@@ -34,26 +56,28 @@ export const useAuth = create<AuthStore>((set) => ({
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
     });
 
-    localStorage.setItem("access_token", data.access_token);
-    localStorage.setItem("refresh_token", data.refresh_token);
+    setAuthTokens(data.access_token, data.refresh_token);
 
     const me = await api.get("/auth/me");
-    set({ user: me.data, isLoading: false });
+    setAuthTokens(data.access_token, data.refresh_token, me.data.role);
+    set({ user: me.data, isLoading: false, status: "authenticated" });
   },
 
   logout: () => {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
-    set({ user: null });
-    window.location.href = "/";
+    clearAuthTokens();
+    set({ user: null, status: "anonymous", isLoading: false });
+    window.location.assign("/");
   },
 
   fetchMe: async () => {
+    set({ status: "checking" });
     try {
       const { data } = await api.get("/auth/me");
-      set({ user: data });
+      setAuthTokens(getAccessToken() ?? "", getRefreshToken() ?? "", data.role);
+      set({ user: data, status: "authenticated", isLoading: false });
     } catch {
-      set({ user: null });
+      clearAuthTokens();
+      set({ user: null, status: "anonymous", isLoading: false });
     }
   },
 }));

@@ -121,7 +121,7 @@ export default function InscriptionPage() {
       // Auto-connexion après inscription
       await login(data.email, data.password);
       toast.success("Compte créé avec succès !");
-      router.push(data.role === "institutional" ? "/dashboard" : "/datasets");
+      router.push("/onboarding");
     } catch (err: unknown) {
       const status = (err as { response?: { status?: number } })?.response?.status;
       if (status === 409) {

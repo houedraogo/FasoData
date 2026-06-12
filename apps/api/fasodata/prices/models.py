@@ -63,6 +63,7 @@ class PriceData(Base):
 
     # ── Méta ──────────────────────────────────────────────────────────────────
     source:     Mapped[str]       = mapped_column(String(50), default=PriceSource.manual)
+    data_origin: Mapped[str]      = mapped_column(String(30), default="manual", server_default="manual", nullable=False, index=True)
     reporter:   Mapped[str | None] = mapped_column(String(100))
     n_obs:      Mapped[int]        = mapped_column(Integer, default=1)
     notes:      Mapped[str | None] = mapped_column(String(500))

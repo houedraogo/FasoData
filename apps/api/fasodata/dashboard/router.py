@@ -6,10 +6,13 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from fasodata.auth.deps import get_current_active_user, require_admin, require_institutional
+from fasodata.core.data_origin import visible_origin_filter
 from fasodata.core.database import get_db
 from fasodata.dashboard.models import (
     AlertRule,
     DashboardPreference,
+    MetricStatus,
+    PlatformSetting,
     Program,
     ProgramPriceAlert,
     ProgramScenario,
@@ -21,6 +24,7 @@ from fasodata.dashboard.models import (
     TeamMember,
 )
 from fasodata.dashboard.schemas import (
+    AdminActivityOut,
     AlertRuleCreate,
     AlertRuleOut,
     AlertRuleUpdate,
@@ -44,22 +48,53 @@ from fasodata.dashboard.schemas import (
     ProgramScenarioOut,
     ProgramScenarioUpdate,
     ProgramUpdate,
+    PlatformSettingsOut,
+    PlatformSettingsPayload,
     SystemMetricCreate,
     SystemMetricOut,
     TeamMemberCreate,
     TeamMemberOut,
     TeamMemberUpdate,
 )
-from fasodata.datasets.models import Dataset, DatasetStatus
+from fasodata.datasets.models import Dataset, DatasetStatus, ImportJob
 from fasodata.prices.models import PriceData
 from fasodata.users.models import User
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
+
+def _visible_price_filters() -> list:
+    origin_filter = visible_origin_filter(PriceData.data_origin)
+    return [origin_filter] if origin_filter is not None else []
+
+
+def _visible_dataset_filters() -> list:
+    origin_filter = visible_origin_filter(Dataset.data_origin)
+    return [origin_filter] if origin_filter is not None else []
+
 DEFAULT_DASHBOARD_PREFERENCES = {
     "domains": ["prices"],
     "data_types": ["time_series", "maps"],
     "regions": ["National"],
+}
+
+DEFAULT_PLATFORM_SETTINGS = {
+    "platform": {
+        "name": "FasoData",
+        "tagline": "Plateforme de donnees ouvertes du Burkina Faso",
+        "contactEmail": "contact@fasodata.bf",
+        "maxFileSize": "100",
+        "defaultPageSize": "20",
+    },
+    "flags": {
+        "publicRegistration": True,
+        "institutionalUpload": True,
+        "geoVisualization": True,
+        "meilisearchSearch": True,
+        "csvExport": True,
+        "maintenanceMode": False,
+        "emailVerification": False,
+    },
 }
 
 
@@ -128,24 +163,6 @@ async def _ensure_default_food_program(db: AsyncSession, user: User | None = Non
     await db.flush()
     return program
 
-
-REGIONS = [
-    {"name": "Sahel", "chef": "Dori", "beneficiaires": 3214, "prix_mais": 342, "indicateur": 82, "objectif": 90},
-    {"name": "Centre", "chef": "Ouagadougou", "beneficiaires": 2876, "prix_mais": 320, "indicateur": 78, "objectif": 85},
-    {"name": "Est", "chef": "Fada N'Gourma", "beneficiaires": 1987, "prix_mais": 328, "indicateur": 71, "objectif": 80},
-    {"name": "Hauts-Bassins", "chef": "Bobo-Dioulasso", "beneficiaires": 1532, "prix_mais": 295, "indicateur": 86, "objectif": 90},
-    {"name": "Nord", "chef": "Ouahigouya", "beneficiaires": 1421, "prix_mais": 318, "indicateur": 75, "objectif": 85},
-    {"name": "Centre-Nord", "chef": "Kaya", "beneficiaires": 712, "prix_mais": 305, "indicateur": 77, "objectif": 82},
-    {"name": "Boucle du M.", "chef": "Dedougou", "beneficiaires": 856, "prix_mais": 298, "indicateur": 68, "objectif": 78},
-    {"name": "Plateau Central", "chef": "Ziniare", "beneficiaires": 601, "prix_mais": 294, "indicateur": 73, "objectif": 80},
-    {"name": "Centre-Ouest", "chef": "Koudougou", "beneficiaires": 748, "prix_mais": 288, "indicateur": 79, "objectif": 85},
-    {"name": "Centre-Sud", "chef": "Manga", "beneficiaires": 523, "prix_mais": 280, "indicateur": 65, "objectif": 75},
-    {"name": "Centre-Est", "chef": "Tenkodogo", "beneficiaires": 634, "prix_mais": 285, "indicateur": 70, "objectif": 78},
-    {"name": "Sud-Ouest", "chef": "Diebougou", "beneficiaires": 389, "prix_mais": 278, "indicateur": 62, "objectif": 72},
-    {"name": "Cascades", "chef": "Banfora", "beneficiaires": 445, "prix_mais": 270, "indicateur": 84, "objectif": 88},
-]
-
-
 def _percent_change(current: int | float, previous: int | float) -> float:
     if previous == 0:
         return 100.0 if current else 0.0
@@ -162,6 +179,56 @@ def _bucket_counts(dates: list[date | datetime], today: date) -> list[int]:
         index = min(7, max(0, (current - start).days // 7))
         buckets[index] += 1
     return buckets
+
+
+COMMODITY_LABELS = {
+    "maize": "Mais",
+    "millet": "Mil",
+    "sorghum": "Sorgho",
+    "rice_local": "Riz local",
+    "rice_imported": "Riz importe",
+    "cowpea": "Niebe",
+    "groundnut": "Arachide",
+}
+
+COMMODITY_COLORS = {
+    "maize": "#E04E2F",
+    "millet": "#1A2C42",
+    "sorghum": "#16A34A",
+    "rice_local": "#F59E0B",
+    "rice_imported": "#1A2C42",
+    "cowpea": "#8B5CF6",
+    "groundnut": "#2563EB",
+}
+
+PRICE_VALID_STATUSES = {"auto", "validated", "aggregated"}
+
+
+def _relative_time(value: datetime | None) -> str:
+    if not value:
+        return "-"
+    now = datetime.now(timezone.utc)
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    seconds = max(0, int((now - value).total_seconds()))
+    if seconds < 60:
+        return f"il y a {seconds} s"
+    minutes = seconds // 60
+    if minutes < 60:
+        return f"il y a {minutes} min"
+    hours = minutes // 60
+    if hours < 24:
+        return f"il y a {hours} h"
+    days = hours // 24
+    return f"il y a {days} j"
+
+
+def _severity_tone(severity: str) -> str:
+    if severity in {"critical", "high"}:
+        return "red"
+    if severity in {"warning", "medium"}:
+        return "amber"
+    return "slate"
 
 
 def _preference_regions(preference: DashboardPreference) -> list[str]:
@@ -232,7 +299,7 @@ async def dashboard_overview(
         )
     )
 
-    price_filters = [PriceData.country == "BFA"]
+    price_filters = [PriceData.country == "BFA", *_visible_price_filters()]
     if "prices" not in (preference.domains or []):
         price_filters.append(PriceData.id.is_(None))
     if selected_regions:
@@ -250,7 +317,7 @@ async def dashboard_overview(
         )
     )
 
-    dataset_filters = [Dataset.status == DatasetStatus.published]
+    dataset_filters = [Dataset.status == DatasetStatus.published, *_visible_dataset_filters()]
     if dataset_filter is not None:
         dataset_filters.append(dataset_filter)
 
@@ -441,7 +508,7 @@ async def dashboard_recommendations(
     recommendations: list[dict] = []
 
     if "prices" in domains:
-        price_filters = [PriceData.country == "BFA"]
+        price_filters = [PriceData.country == "BFA", *_visible_price_filters()]
         if selected_regions:
             price_filters.append(PriceData.region.in_(selected_regions))
         latest_result = await db.execute(
@@ -494,10 +561,14 @@ async def dashboard_recommendations(
             select(func.count(Dataset.id)).where(
                 Dataset.status == DatasetStatus.published,
                 Dataset.is_geo.is_(True),
+                *_visible_dataset_filters(),
             )
         )
         price_region_count = await db.scalar(
-            select(func.count(func.distinct(PriceData.region))).where(PriceData.country == "BFA")
+            select(func.count(func.distinct(PriceData.region))).where(
+                PriceData.country == "BFA",
+                *_visible_price_filters(),
+            )
         )
         recommendations.append({
             "key": "map-layers",
@@ -519,6 +590,7 @@ async def dashboard_recommendations(
             query = select(Dataset).where(
                 Dataset.status == DatasetStatus.published,
                 _dataset_match_filter(keywords),
+                *_visible_dataset_filters(),
             )
             if domain == "prices":
                 query = query.order_by(
@@ -534,6 +606,7 @@ async def dashboard_recommendations(
                 select(func.count(Dataset.id)).where(
                     Dataset.status == DatasetStatus.published,
                     _dataset_match_filter(keywords),
+                    *_visible_dataset_filters(),
                 )
             )
             label = DOMAIN_LABELS.get(domain, domain)
@@ -580,7 +653,7 @@ async def dashboard_region_summary(
             func.avg(PriceData.price).label("avg_price"),
             func.max(PriceData.price_date).label("latest_date"),
         )
-        .where(PriceData.country == "BFA")
+        .where(PriceData.country == "BFA", *_visible_price_filters())
         .group_by(PriceData.region)
         .order_by(func.count(PriceData.id).desc())
     )
@@ -697,7 +770,11 @@ async def create_program_alert(
 
         price_result = await db.execute(
             select(PriceData)
-            .where(PriceData.commodity == data.commodity, PriceData.region == data.region)
+            .where(
+                PriceData.commodity == data.commodity,
+                PriceData.region == data.region,
+                *_visible_price_filters(),
+            )
             .order_by(PriceData.price_date.desc(), PriceData.created_at.desc())
             .limit(1)
         )
@@ -816,41 +893,100 @@ async def delete_program_scenario(
 
 
 @router.get("/food-prices")
-async def food_prices():
+async def food_prices(db: AsyncSession = Depends(get_db)):
+    rows_result = await db.execute(
+        select(PriceData)
+        .where(
+            PriceData.country == "BFA",
+            PriceData.validation_status.in_(PRICE_VALID_STATUSES),
+            *_visible_price_filters(),
+        )
+        .order_by(PriceData.price_date.desc(), PriceData.created_at.desc())
+    )
+    rows = rows_result.scalars().all()
+
+    latest_by_commodity: dict[str, PriceData] = {}
+    series_by_commodity: dict[str, list[PriceData]] = {}
+    maize_by_region: dict[str, PriceData] = {}
+    for row in rows:
+        latest_by_commodity.setdefault(row.commodity, row)
+        series_by_commodity.setdefault(row.commodity, []).append(row)
+        if row.commodity == "maize" and row.region:
+            maize_by_region.setdefault(row.region, row)
+
+    commodities = []
+    for commodity, latest in sorted(latest_by_commodity.items(), key=lambda item: COMMODITY_LABELS.get(item[0], item[0])):
+        commodity_rows = sorted(series_by_commodity[commodity], key=lambda item: item.price_date)[-8:]
+        previous_price = commodity_rows[-2].price if len(commodity_rows) > 1 else latest.price
+        commodities.append({
+            "name": COMMODITY_LABELS.get(commodity, commodity),
+            "price": round(latest.price, 1),
+            "change": _percent_change(latest.price, previous_price),
+            "color": COMMODITY_COLORS.get(commodity, "#6B7280"),
+            "data": [round(item.price, 1) for item in commodity_rows],
+        })
+
+    focus_regions = ["Sahel", "Centre", "Hauts-Bassins", "Cascades"]
+    period_dates = sorted({row.price_date for row in rows})[-8:]
+    price_evolution = []
+    for current_date in period_dates:
+        item = {"month": current_date.strftime("%Y-%m")}
+        for region in focus_regions:
+            region_key = "hauts" if region == "Hauts-Bassins" else region.lower().replace("-", "_")
+            candidates = [
+                row.price for row in rows
+                if row.price_date == current_date
+                and row.region == region
+                and row.commodity == "maize"
+            ]
+            item[region_key] = round(sum(candidates) / len(candidates), 1) if candidates else 0
+        price_evolution.append(item)
+
+    regions = [
+        {
+            "name": region,
+            "chef": "",
+            "beneficiaires": 0,
+            "prix_mais": round(row.price, 1),
+            "indicateur": None,
+            "objectif": None,
+        }
+        for region, row in sorted(maize_by_region.items())
+    ]
+
+    volatility = []
+    for commodity, commodity_rows in series_by_commodity.items():
+        prices = [row.price for row in commodity_rows]
+        if len(prices) < 2:
+            sigma = 0
+        else:
+            avg = sum(prices) / len(prices)
+            sigma = (sum((price - avg) ** 2 for price in prices) / len(prices)) ** 0.5
+        volatility.append({"name": COMMODITY_LABELS.get(commodity, commodity), "sigma": round(sigma, 1)})
+
+    thresholds_result = await db.execute(
+        select(AlertRule)
+        .where(AlertRule.metric_key.ilike("price%"))
+        .order_by(AlertRule.created_at.desc())
+        .limit(12)
+    )
+    thresholds = [
+        {
+            "name": f"{rule.name}{f' - {rule.region}' if rule.region else ''}",
+            "threshold": f"Seuil {rule.comparator} {rule.threshold_value:g} {rule.unit or ''}".strip(),
+            "value": rule.threshold_value,
+            "severity": rule.severity.value,
+        }
+        for rule in thresholds_result.scalars().all()
+    ]
+
     return {
         "updated_at": datetime.now(timezone.utc).isoformat(),
-        "commodities": [
-            {"name": "Mais", "price": 325, "change": 8.4, "color": "#E04E2F", "data": [265, 272, 280, 291, 298, 310, 318, 325]},
-            {"name": "Mil", "price": 370, "change": 5.1, "color": "#1A2C42", "data": [340, 344, 348, 352, 356, 360, 366, 370]},
-            {"name": "Sorgho", "price": 312, "change": 3.2, "color": "#16A34A", "data": [295, 298, 300, 303, 306, 308, 310, 312]},
-            {"name": "Riz local", "price": 520, "change": 12.7, "color": "#F59E0B", "data": [445, 458, 470, 480, 490, 502, 510, 520]},
-            {"name": "Haricot", "price": 780, "change": -2.1, "color": "#8B5CF6", "data": [810, 806, 802, 798, 794, 790, 784, 780]},
-        ],
-        "price_evolution": [
-            {"month": "M44", "sahel": 240, "centre": 235, "hauts": 228, "cascades": 222},
-            {"month": "M52", "sahel": 248, "centre": 240, "hauts": 232, "cascades": 226},
-            {"month": "W8", "sahel": 258, "centre": 248, "hauts": 238, "cascades": 232},
-            {"month": "W16", "sahel": 272, "centre": 258, "hauts": 246, "cascades": 238},
-            {"month": "W24", "sahel": 285, "centre": 268, "hauts": 254, "cascades": 248},
-            {"month": "W32", "sahel": 305, "centre": 285, "hauts": 264, "cascades": 256},
-            {"month": "W40", "sahel": 328, "centre": 305, "hauts": 278, "cascades": 262},
-            {"month": "W42", "sahel": 342, "centre": 320, "hauts": 285, "cascades": 270},
-        ],
-        "regions": REGIONS,
-        "volatility": [
-            {"name": "Riz local", "sigma": 38},
-            {"name": "Mais", "sigma": 31},
-            {"name": "Mil", "sigma": 24},
-            {"name": "Sorgho", "sigma": 19},
-            {"name": "Haricot", "sigma": 14},
-            {"name": "Niebe", "sigma": 11},
-        ],
-        "thresholds": [
-            {"name": "Mais - Sahel", "threshold": "Seuil > 320 CFA/kg", "value": 342, "severity": "critical"},
-            {"name": "Riz local - National", "threshold": "Seuil > 500 CFA/kg", "value": 520, "severity": "critical"},
-            {"name": "Mil - Nord", "threshold": "Seuil > 380 CFA/kg", "value": 375, "severity": "warning"},
-            {"name": "Sorgho - Centre", "threshold": "Seuil > 320 CFA/kg", "value": 305, "severity": "ok"},
-        ],
+        "commodities": commodities,
+        "price_evolution": price_evolution,
+        "regions": regions,
+        "volatility": sorted(volatility, key=lambda item: item["sigma"], reverse=True),
+        "thresholds": thresholds,
     }
 
 
@@ -858,17 +994,24 @@ async def food_prices():
 async def alerts(db: AsyncSession = Depends(get_db)):
     rules_result = await db.execute(select(AlertRule).order_by(AlertRule.created_at.desc()).limit(20))
     stored_rules = rules_result.scalars().all()
-    fallback_rules = [
-        {"name": "Prix du mil - Sahel", "threshold": "> 320 CFA/kg", "channel": "Email + SMS", "status": "active"},
-        {"name": "Couverture vaccinale", "threshold": "< 72%", "channel": "Email", "status": "active"},
-        {"name": "Pluviometrie extreme", "threshold": "> 150 mm/24h", "channel": "Webhook", "status": "paused"},
-    ]
+    triggered_result = await db.execute(
+        select(ProgramPriceAlert)
+        .where(ProgramPriceAlert.is_triggered.is_(True))
+        .order_by(ProgramPriceAlert.updated_at.desc(), ProgramPriceAlert.created_at.desc())
+        .limit(20)
+    )
+    triggered = triggered_result.scalars().all()
     return {
         "items": [
-            {"id": 1, "title": "Prix du mil > seuil critique", "location": "Sahel - Dori", "time": "il y a 32 min", "value": "+24% en 7j", "severity": "critical"},
-            {"id": 2, "title": "Couverture vaccinale en baisse", "location": "Est - Fada", "time": "il y a 2h", "value": "-3.2 pts", "severity": "warning"},
-            {"id": 3, "title": "Dataset partenaire mis a jour", "location": "INSD - IPC", "time": "il y a 4h", "value": "nouvelle version", "severity": "info"},
-            {"id": 4, "title": "Precipitations exceptionnelles", "location": "Cascades - Banfora", "time": "hier", "value": "+180 mm/24h", "severity": "warning"},
+            {
+                "id": str(alert.id),
+                "title": f"{COMMODITY_LABELS.get(alert.commodity, alert.commodity)} > seuil",
+                "location": alert.region,
+                "time": _relative_time(alert.updated_at or alert.created_at),
+                "value": f"{round(alert.current_price or 0):g} / {round(alert.threshold_price):g} CFA/kg",
+                "severity": "critical" if (alert.current_price or 0) >= alert.threshold_price * 1.15 else "warning",
+            }
+            for alert in triggered
         ],
         "rules": [
             {
@@ -878,7 +1021,7 @@ async def alerts(db: AsyncSession = Depends(get_db)):
                 "status": rule.status.value,
             }
             for rule in stored_rules
-        ] or fallback_rules,
+        ],
     }
 
 
@@ -913,33 +1056,33 @@ async def supervision(db: AsyncSession = Depends(get_db)):
         if metric.metric_key in {"cpu", "memory", "db_storage", "object_storage", "bandwidth"}
     ]
 
-    fallback_services = [
-        {"name": "API REST", "desc": "app.fasodata.bf", "version": "v1.4.2", "uptime": "99.98%", "latency": "142 ms", "status": "ok"},
-        {"name": "Base PostgreSQL", "desc": "cluster primaire - 3 noeuds", "version": "15.3", "uptime": "99.99%", "latency": "8 ms", "status": "ok"},
-        {"name": "PostGIS / SIG", "desc": "extension activee", "version": "3.4", "uptime": "99.92%", "latency": "24 ms", "status": "ok"},
-        {"name": "Stockage MinIO", "desc": "4.2 To utilises / 10 To", "version": "S3", "uptime": "100%", "latency": "18 ms", "status": "ok"},
-        {"name": "Meilisearch", "desc": "CPU eleve sur node-2", "version": "1.8", "uptime": "99.87%", "latency": "62 ms", "status": "warn"},
-        {"name": "Worker imports", "desc": "queue : 12 jobs", "version": "4 actifs", "uptime": "100%", "latency": "-", "status": "ok"},
-    ]
-    fallback_resources = [
-        {"label": "CPU", "value": 48, "detail": "4 vCPU - 8 coeurs"},
-        {"label": "Memoire", "value": 62, "detail": "9.9 Go / 16 Go"},
-        {"label": "Stockage BDD", "value": 71, "detail": "142 Go / 200 Go"},
-        {"label": "Stockage objet", "value": 42, "detail": "4.2 To / 10 To"},
-        {"label": "Bande passante", "value": 35, "detail": "350 Mbps / 1 Gbps"},
-    ]
+    metric_by_key = {metric.metric_key: metric for metric in stored_metrics}
+    status = "operational"
+    if any(metric.status.value == "down" for metric in stored_metrics):
+        status = "incident"
+    elif any(metric.status.value == "warn" for metric in stored_metrics):
+        status = "degraded"
+
+    def kpi(metric_key: str, label: str, unit: str = "", sub: str = ""):
+        metric = metric_by_key.get(metric_key)
+        return {
+            "label": label,
+            "value": f"{metric.value:g}" if metric else "0",
+            "unit": metric.unit if metric and metric.unit is not None else unit,
+            "sub": metric.metadata_json.get("detail", sub) if metric and metric.metadata_json else sub,
+        }
 
     return {
-        "status": "operational",
-        "last_check": "il y a 12 s",
+        "status": status,
+        "last_check": _relative_time(stored_metrics[0].recorded_at) if stored_metrics else "-",
         "kpis": [
-            {"label": "Uptime 30j", "value": "99.94", "unit": "%", "sub": "objectif 99.5%"},
-            {"label": "Temps reponse API", "value": "142", "unit": "ms", "sub": "cible < 200 ms"},
-            {"label": "Requetes / h", "value": "8.2k", "unit": "", "sub": "+12% vs hier"},
-            {"label": "Erreurs 5xx", "value": "0.03", "unit": "%", "sub": "cible < 0.5%"},
+            kpi("uptime_30d", "Uptime 30j", "%", "objectif 99.5%"),
+            kpi("api_latency_ms", "Temps reponse API", "ms", "cible < 200 ms"),
+            kpi("requests_per_hour", "Requetes / h"),
+            kpi("error_rate_5xx", "Erreurs 5xx", "%", "cible < 0.5%"),
         ],
-        "services": metric_services if len(metric_services) >= 3 else fallback_services,
-        "resources": metric_resources if len(metric_resources) >= 3 else fallback_resources,
+        "services": metric_services,
+        "resources": metric_resources,
     }
 
 
@@ -947,66 +1090,57 @@ async def supervision(db: AsyncSession = Depends(get_db)):
 async def validation_quality(db: AsyncSession = Depends(get_db)):
     check_result = await db.execute(select(QualityCheck).order_by(QualityCheck.created_at.desc()).limit(1))
     check = check_result.scalar_one_or_none()
-    if check:
-        issues_result = await db.execute(
-            select(QualityIssue)
-            .where(QualityIssue.check_id == check.id)
-            .order_by(QualityIssue.created_at.desc())
-            .limit(12)
-        )
-        issues = issues_result.scalars().all()
+    if not check:
         return {
-            "dataset": {"check_id": str(check.id), "name": check.dataset_slug or "dataset", "rows": check.total_rows, "flagged": check.flagged_rows, "reviewer": "Equipe qualite"},
-            "summary": {"score": check.score, "status": "Acceptable" if check.score >= 80 else "A revoir", "target": ">= 90", "completeness": check.completeness, "coherence": check.coherence, "duplicates": check.duplicate_count},
-            "rows": [
-                {"issue_id": str(issue.id), "line": issue.line_number or 0, "column": issue.column_name or "-", "value": issue.raw_value or "-", "problem": issue.problem, "suggestion": issue.suggestion or "-", "action": "Corriger" if not issue.suggestion else "Appliquer"}
-                for issue in issues
-                if not issue.is_resolved
-            ],
-            "problems": [
-                {"name": issue.problem, "count": 1, "tone": "red" if issue.severity.value in {"high", "critical"} else "amber"}
-                for issue in issues[:5]
-            ],
-            "history": [
-                {"actor": "QA", "label": "Controle qualite charge depuis la base", "time": "maintenant"},
-            ],
+            "dataset": {"check_id": None, "name": None, "rows": 0, "flagged": 0, "reviewer": None},
+            "summary": {"score": 0, "status": "Aucun controle", "target": ">= 90", "completeness": 0, "coherence": 0, "duplicates": 0},
+            "rows": [],
+            "problems": [],
+            "history": [],
         }
-
+    issues_result = await db.execute(
+        select(QualityIssue)
+        .where(QualityIssue.check_id == check.id)
+        .order_by(QualityIssue.created_at.desc())
+        .limit(12)
+    )
+    issues = issues_result.scalars().all()
     return {
-        "dataset": {"check_id": None, "name": "enquete_sante_q1_2025", "rows": 2847, "flagged": 47, "reviewer": "Dr. Sory Traore"},
-        "summary": {"score": 83, "status": "Acceptable", "target": ">= 90", "completeness": 94, "coherence": 89, "duplicates": 12},
+        "dataset": {"check_id": str(check.id), "name": check.dataset_slug or "dataset", "rows": check.total_rows, "flagged": check.flagged_rows, "reviewer": "Equipe qualite" if check.reviewer_id else None},
+        "summary": {"score": check.score, "status": "Acceptable" if check.score >= 80 else "A revoir", "target": ">= 90", "completeness": check.completeness, "coherence": check.coherence, "duplicates": check.duplicate_count},
         "rows": [
-            {"issue_id": None, "line": 47, "column": "date_enr", "value": "2026-03-12", "problem": "Date dans le futur", "suggestion": "-", "action": "Corriger"},
-            {"issue_id": None, "line": 102, "column": "id_enq", "value": "EQ-2025-001", "problem": "Doublon (ligne 23)", "suggestion": "-", "action": "Corriger"},
-            {"issue_id": None, "line": 134, "column": "commune", "value": "Wagadougou", "problem": "Commune non reconnue", "suggestion": "Ouagadougou", "action": "Appliquer"},
-            {"issue_id": None, "line": 256, "column": "temp_c", "value": "43.8", "problem": "Valeur aberrante (> 42C)", "suggestion": "-", "action": "Corriger"},
-            {"issue_id": None, "line": 312, "column": "commune", "value": "Bobo-D", "problem": "Forme abregee", "suggestion": "Bobo-Dioulasso", "action": "Appliquer"},
-            {"line": 418, "column": "observation", "value": "ø", "problem": "Manquant", "suggestion": "-", "action": "Corriger"},
-            {"issue_id": None, "line": 901, "column": "date_enr", "value": "14/01/2025", "problem": "Format date non standard", "suggestion": "2025-01-14", "action": "Appliquer"},
+            {"issue_id": str(issue.id), "line": issue.line_number or 0, "column": issue.column_name or "-", "value": issue.raw_value or "-", "problem": issue.problem, "suggestion": issue.suggestion or "-", "action": "Corriger" if not issue.suggestion else "Appliquer"}
+            for issue in issues
+            if not issue.is_resolved
         ],
         "problems": [
-            {"name": "Doublons sur ID enquete", "count": 12, "tone": "red"},
-            {"name": "Dates dans le futur", "count": 3, "tone": "red"},
-            {"name": "Valeurs aberrantes", "count": 8, "tone": "amber"},
-            {"name": "Commune non reconnue", "count": 6, "tone": "amber"},
-            {"name": "Valeurs manquantes", "count": 18, "tone": "slate"},
+            {"name": issue.problem, "count": 1, "tone": _severity_tone(issue.severity.value)}
+            for issue in issues[:5]
         ],
         "history": [
-            {"actor": "AS", "label": "Import du fichier source", "time": "il y a 1 h"},
-            {"actor": "AI", "label": "Controles automatiques executes", "time": "il y a 44 min"},
-            {"actor": "AS", "label": "Mappage des colonnes applique", "time": "il y a 30 min"},
-            {"actor": "ST", "label": "Revue commencee", "time": "il y a 16 min"},
+            {"actor": "QA", "label": "Controle qualite charge depuis la base", "time": _relative_time(check.created_at)},
         ],
     }
+
 
 
 @router.get("/organizations")
 async def organizations(db: AsyncSession = Depends(get_db)):
     users_by_org_result = await db.execute(
-        select(User.organization, func.count(User.id))
+        select(
+            User.organization,
+            func.count(User.id),
+            func.count(User.id).filter(User.is_verified.is_(True)),
+        )
         .where(User.organization.is_not(None))
         .group_by(User.organization)
         .order_by(func.count(User.id).desc())
+    )
+    datasets_by_org_result = await db.execute(
+        select(User.organization, func.count(Dataset.id))
+        .join(User, Dataset.owner_id == User.id)
+        .where(User.organization.is_not(None))
+        .group_by(User.organization)
     )
     dataset_total_result = await db.execute(select(func.count(Dataset.id)))
     user_total_result = await db.execute(select(func.count(User.id)))
@@ -1014,35 +1148,142 @@ async def organizations(db: AsyncSession = Depends(get_db)):
     dataset_total = dataset_total_result.scalar_one()
     user_total = user_total_result.scalar_one()
     grouped = users_by_org_result.all()
-
-    fallback = [
-        {"name": "ACEEDO", "type": "ONG nationale", "datasets": 18, "users": 24, "status": "Verifiee"},
-        {"name": "INSD", "type": "Institution publique", "datasets": 42, "users": 16, "status": "Verifiee"},
-        {"name": "Ministere de la Sante", "type": "Administration", "datasets": 31, "users": 38, "status": "Verifiee"},
-        {"name": "OCHA Burkina Faso", "type": "Agence internationale", "datasets": 12, "users": 9, "status": "En revue"},
-    ]
+    dataset_counts = {org: count for org, count in datasets_by_org_result.all()}
 
     items = [
         {
             "name": org or "Organisation non renseignee",
             "type": "Organisation partenaire",
-            "datasets": max(1, dataset_total // max(1, len(grouped))) if dataset_total else 0,
+            "datasets": dataset_counts.get(org, 0),
             "users": count,
-            "status": "Verifiee",
+            "status": "Verifiee" if verified_count == count else "En revue",
         }
-        for org, count in grouped
-    ] or fallback
+        for org, count, verified_count in grouped
+    ]
 
     return {
         "kpis": {
             "organizations": len(items),
             "verified": sum(1 for item in items if item["status"] == "Verifiee"),
-            "datasets": dataset_total or sum(item["datasets"] for item in items),
+            "datasets": dataset_total,
             "regions": "13/13",
-            "users": user_total or sum(item["users"] for item in items),
+            "users": user_total,
         },
         "items": items,
     }
+
+
+@router.get("/admin-settings", response_model=PlatformSettingsOut)
+async def get_admin_settings(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    result = await db.execute(select(PlatformSetting).where(PlatformSetting.key == "admin"))
+    setting = result.scalar_one_or_none()
+    values = {
+        "platform": dict(DEFAULT_PLATFORM_SETTINGS["platform"]),
+        "flags": dict(DEFAULT_PLATFORM_SETTINGS["flags"]),
+    }
+    if setting:
+        stored = setting.value or {}
+        values["platform"].update(stored.get("platform") or {})
+        values["flags"].update(stored.get("flags") or {})
+    return PlatformSettingsOut(
+        **values,
+        updated_at=setting.updated_at if setting else None,
+        updated_by_id=setting.updated_by_id if setting else None,
+    )
+
+
+@router.put("/admin-settings", response_model=PlatformSettingsOut)
+async def update_admin_settings(
+    data: PlatformSettingsPayload,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    values = {
+        "platform": {**DEFAULT_PLATFORM_SETTINGS["platform"], **data.platform},
+        "flags": {**DEFAULT_PLATFORM_SETTINGS["flags"], **data.flags},
+    }
+    result = await db.execute(select(PlatformSetting).where(PlatformSetting.key == "admin"))
+    setting = result.scalar_one_or_none()
+    if setting:
+        setting.value = values
+        setting.updated_by_id = current_user.id
+        setting.updated_at = datetime.now(timezone.utc)
+    else:
+        setting = PlatformSetting(key="admin", value=values, updated_by_id=current_user.id)
+        db.add(setting)
+    await db.flush()
+    return PlatformSettingsOut(**values, updated_at=setting.updated_at, updated_by_id=setting.updated_by_id)
+
+
+@router.get("/admin/activity", response_model=list[AdminActivityOut])
+async def admin_activity(
+    limit: int = Query(8, ge=1, le=50),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    events: list[dict] = []
+
+    users_result = await db.execute(select(User).order_by(User.created_at.desc()).limit(limit))
+    for user in users_result.scalars().all():
+        events.append({
+            "type": "user",
+            "message": f"Inscription : {user.email}",
+            "time": _relative_time(user.created_at),
+            "status": "success" if user.is_verified else "info",
+            "created_at": user.created_at,
+        })
+
+    datasets_result = await db.execute(select(Dataset).order_by(Dataset.created_at.desc()).limit(limit))
+    for dataset in datasets_result.scalars().all():
+        events.append({
+            "type": "dataset",
+            "message": f"Dataset {dataset.status.value} : {dataset.name}",
+            "time": _relative_time(dataset.created_at),
+            "status": "success" if dataset.status == DatasetStatus.published else "info",
+            "created_at": dataset.created_at,
+        })
+
+    imports_result = await db.execute(select(ImportJob).order_by(ImportJob.created_at.desc()).limit(limit))
+    for job in imports_result.scalars().all():
+        status = "warning" if job.status in {"failed", "error"} else "success" if job.status == "completed" else "info"
+        events.append({
+            "type": "import",
+            "message": f"Import {job.status} ({job.rows_imported} lignes)",
+            "time": _relative_time(job.created_at),
+            "status": status,
+            "created_at": job.created_at,
+        })
+
+    checks_result = await db.execute(select(QualityCheck).order_by(QualityCheck.created_at.desc()).limit(limit))
+    for check in checks_result.scalars().all():
+        events.append({
+            "type": "quality",
+            "message": f"Controle qualite : {check.dataset_slug or check.dataset_id or 'dataset'}",
+            "time": _relative_time(check.created_at),
+            "status": "warning" if check.score and check.score < 75 else "success",
+            "created_at": check.created_at,
+        })
+
+    metrics_result = await db.execute(
+        select(SystemMetric)
+        .where(SystemMetric.status.in_([MetricStatus.warn, MetricStatus.down]))
+        .order_by(SystemMetric.recorded_at.desc())
+        .limit(limit)
+    )
+    for metric in metrics_result.scalars().all():
+        events.append({
+            "type": "alert",
+            "message": f"{metric.service} : {metric.label} {metric.value:g}{metric.unit or ''}",
+            "time": _relative_time(metric.recorded_at),
+            "status": "warning",
+            "created_at": metric.recorded_at,
+        })
+
+    events.sort(key=lambda event: event["created_at"], reverse=True)
+    return events[:limit]
 
 
 @router.get("/alert-rules", response_model=list[AlertRuleOut])

@@ -9,6 +9,8 @@ type TranslationDictionary = Record<string, TranslationValue>;
 
 const STORAGE_KEY = "fasodata.locale";
 
+// Scope actuel: navigation publique, footer et page d'accueil.
+// Les espaces dashboard/admin restent en francais tant que leur dictionnaire complet n'est pas couvert.
 const dictionaries: Record<Locale, TranslationDictionary> = {
   fr: {
     "nav.datasets": "Explorer les donnees",
@@ -51,6 +53,21 @@ const dictionaries: Record<Locale, TranslationDictionary> = {
     "home.categoriesSubtitle": "Des donnees organisees par secteur pour faciliter votre recherche",
     "home.allCategories": "Voir toutes les categories",
     "home.datasetsLabel": "datasets",
+    "home.audiencesTitle": "Une plateforme pour quatre familles d'utilisateurs",
+    "home.audiencesSubtitle":
+      "FasoData transforme les donnees fiables en appui concret pour la recherche, l'analyse de marche et la decision publique.",
+    "home.audience.academic.title": "Etudiants, universites et chercheurs",
+    "home.audience.academic.description":
+      "Acceder a des donnees fiables, citees et comparables pour conduire des memoires, theses, articles et travaux de recherche.",
+    "home.audience.business.title": "Entreprises",
+    "home.audience.business.description":
+      "Comprendre un secteur, comparer les territoires et preparer des etudes de marche avec des indicateurs exploitables.",
+    "home.audience.ngo.title": "ONG",
+    "home.audience.ngo.description":
+      "Suivre les indicateurs d'impact, documenter les zones d'intervention et ajuster les programmes avec des donnees actualisees.",
+    "home.audience.state.title": "Etat et institutions publiques",
+    "home.audience.state.description":
+      "Observer les prix, les tendances et les indicateurs essentiels pour prendre des decisions publiques mieux informees.",
     "home.featuresTitle": "Tout ce dont vous avez besoin",
     "home.featuresSubtitle":
       "Une plateforme complete pour acceder, analyser et partager les donnees publiques du Burkina Faso",
@@ -120,6 +137,21 @@ const dictionaries: Record<Locale, TranslationDictionary> = {
     "home.categoriesSubtitle": "Data organized by sector to make your search easier",
     "home.allCategories": "View all categories",
     "home.datasetsLabel": "datasets",
+    "home.audiencesTitle": "A platform for four user groups",
+    "home.audiencesSubtitle":
+      "FasoData turns reliable data into practical support for research, market analysis and public decision-making.",
+    "home.audience.academic.title": "Students, universities and researchers",
+    "home.audience.academic.description":
+      "Access reliable, cited and comparable data for dissertations, theses, articles and research work.",
+    "home.audience.business.title": "Businesses",
+    "home.audience.business.description":
+      "Understand a sector, compare territories and prepare market studies with usable indicators.",
+    "home.audience.ngo.title": "NGOs",
+    "home.audience.ngo.description":
+      "Monitor impact indicators, document intervention areas and adjust programmes with updated data.",
+    "home.audience.state.title": "Government and public institutions",
+    "home.audience.state.description":
+      "Track prices, trends and key indicators to make better-informed public decisions.",
     "home.featuresTitle": "Everything you need",
     "home.featuresSubtitle": "A complete platform to access, analyze and share public data from Burkina Faso",
     "home.ctaTitle": "Do you have data to share?",

@@ -15,7 +15,7 @@ const ChoroplethPrix = dynamic(
 
 const COMMODITIES = [
   { key: "sorghum",    label: "Sorgho",    color: "#E04E2F", seuil: 320 },
-  { key: "rice_local", label: "Riz local", color: "#1A2C42", seuil: 500 },
+  { key: "rice_imported", label: "Riz importé", color: "#1A2C42", seuil: 500 },
   { key: "maize",      label: "Maïs",      color: "#16A34A", seuil: 300 },
   { key: "millet",     label: "Mil",       color: "#D97706", seuil: 350 },
   { key: "cowpea",     label: "Niébé",     color: "#8B5CF6", seuil: 650 },

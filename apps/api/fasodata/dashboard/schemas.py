@@ -68,6 +68,24 @@ class SystemMetricOut(SystemMetricCreate):
     model_config = {"from_attributes": True}
 
 
+class PlatformSettingsPayload(BaseModel):
+    platform: dict = Field(default_factory=dict)
+    flags: dict = Field(default_factory=dict)
+
+
+class PlatformSettingsOut(PlatformSettingsPayload):
+    updated_at: datetime | None = None
+    updated_by_id: uuid.UUID | None = None
+
+
+class AdminActivityOut(BaseModel):
+    type: str
+    message: str
+    time: str
+    status: str
+    created_at: datetime
+
+
 class TeamMemberCreate(BaseModel):
     organization: str
     email: str

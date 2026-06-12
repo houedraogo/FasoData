@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Activity,
+  AlertTriangle,
   BookOpen,
   Braces,
   CheckCircle,
@@ -15,7 +16,9 @@ import {
   Layers,
   Lock,
   Map,
+  RefreshCw,
   Search,
+  Server,
   Shield,
   Terminal,
   Timer,
@@ -23,6 +26,18 @@ import {
 import { cn } from "@/lib/utils";
 
 type Lang = "curl" | "python" | "javascript";
+type Endpoint = { method: string; path: string; scope: string; desc: string; tag?: string };
+type OpenApiOperation = {
+  summary?: string;
+  description?: string;
+  tags?: string[];
+  security?: Array<Record<string, string[]>>;
+};
+type OpenApiSchema = {
+  openapi?: string;
+  info?: { title?: string; version?: string; description?: string };
+  paths?: Record<string, Record<string, OpenApiOperation>>;
+};
 
 const BASE_URL = "https://api.fasodata.bf";
 
@@ -69,7 +84,56 @@ const datasets = await fetch(\`\${BASE_URL}/api/datasets?page=1&page_size=10\`, 
 console.log(await datasets.json());`,
 };
 
-const ENDPOINTS = [
+const SDK_SNIPPETS: Record<Lang, string> = {
+  curl: `export FASODATA_TOKEN="<access_token>"
+
+curl "${BASE_URL}/api/search?q=prix%20mil" \\
+  -H "Authorization: Bearer $FASODATA_TOKEN"
+
+curl "${BASE_URL}/api/prices/latest?region=Sahel" \\
+  -H "Authorization: Bearer $FASODATA_TOKEN"`,
+  python: `from typing import Any
+import requests
+
+class FasoDataClient:
+    def __init__(self, token: str, base_url: str = "${BASE_URL}"):
+        self.base_url = base_url.rstrip("/")
+        self.headers = {"Authorization": f"Bearer {token}"}
+
+    def get(self, path: str, **params: Any):
+        response = requests.get(
+            f"{self.base_url}{path}",
+            headers=self.headers,
+            params=params,
+            timeout=30,
+        )
+        response.raise_for_status()
+        return response.json()
+
+client = FasoDataClient("<access_token>")
+print(client.get("/api/prices/latest", region="Sahel"))`,
+  javascript: `class FasoDataClient {
+  constructor(token, baseUrl = "${BASE_URL}") {
+    this.token = token;
+    this.baseUrl = baseUrl.replace(/\\/$/, "");
+  }
+
+  async get(path, params = {}) {
+    const url = new URL(\`\${this.baseUrl}\${path}\`);
+    Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
+    const response = await fetch(url, {
+      headers: { Authorization: \`Bearer \${this.token}\` },
+    });
+    if (!response.ok) throw new Error(\`FasoData API error \${response.status}\`);
+    return response.json();
+  }
+}
+
+const client = new FasoDataClient("<access_token>");
+console.log(await client.get("/api/prices/latest", { region: "Sahel" }));`,
+};
+
+const FALLBACK_ENDPOINTS: Endpoint[] = [
   { method: "GET", path: "/api/health", scope: "Public", desc: "Etat du service API et version courante." },
   { method: "POST", path: "/api/auth/register", scope: "Public", desc: "Cree un compte utilisateur." },
   { method: "POST", path: "/api/auth/login", scope: "Public", desc: "Retourne un access token et un refresh token." },
@@ -104,6 +168,11 @@ const ENDPOINTS = [
   { method: "PATCH", path: "/api/dashboard/quality-issues/{issue_id}/resolve", scope: "Institution", desc: "Marque une anomalie qualite comme resolue." },
 ];
 
+const API_VERSIONS = [
+  { version: "v1", status: "Stable", text: "Version courante exposee par FastAPI et documentee via OpenAPI." },
+  { version: "v1.1", status: "A venir", text: "Endpoints prix multi-pays, webhooks et SDK publics stabilises." },
+];
+
 const ERROR_CODES = [
   { code: "400", label: "Bad Request", desc: "Parametres invalides ou compte desactive." },
   { code: "401", label: "Unauthorized", desc: "Token absent, expire ou invalide." },
@@ -120,13 +189,49 @@ const METHOD_COLORS: Record<string, string> = {
   DELETE: "bg-red-50 text-red-700 ring-red-100",
 };
 
+function inferScope(operation: OpenApiOperation): string {
+  const joined = JSON.stringify(operation.security ?? "").toLowerCase();
+  if (!operation.security || operation.security.length === 0) return "Public";
+  if (joined.includes("admin")) return "Admin";
+  return "Bearer";
+}
+
+function endpointsFromOpenApi(schema: OpenApiSchema | null): Endpoint[] {
+  if (!schema?.paths) return FALLBACK_ENDPOINTS;
+  return Object.entries(schema.paths)
+    .flatMap(([path, methods]) =>
+      Object.entries(methods)
+        .filter(([method]) => METHOD_COLORS[method.toUpperCase()])
+        .map(([method, operation]) => ({
+          method: method.toUpperCase(),
+          path,
+          scope: inferScope(operation),
+          desc: operation.summary || operation.description || "Endpoint expose par l'API FasoData.",
+          tag: operation.tags?.[0] ?? "General",
+        }))
+    )
+    .sort((a, b) => a.path.localeCompare(b.path) || a.method.localeCompare(b.method));
+}
+
 function CodeBlock({ code }: { code: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    await navigator.clipboard?.writeText(code);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1400);
+  };
+
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-700 bg-[#0F172A]">
+    <div className="min-w-0 overflow-hidden rounded-xl border border-slate-700 bg-[#0F172A]">
       <div className="flex items-center justify-between border-b border-white/10 px-4 py-2">
         <span className="text-xs font-semibold text-slate-300">Exemple</span>
-        <button className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-2.5 py-1 text-xs font-semibold text-white">
-          <Copy className="h-3.5 w-3.5" /> Copier
+        <button
+          type="button"
+          onClick={copy}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-2.5 py-1 text-xs font-semibold text-white"
+          aria-label="Copier l'exemple de code"
+        >
+          <Copy className="h-3.5 w-3.5" /> {copied ? "Copie" : "Copier"}
         </button>
       </div>
       <pre className="overflow-x-auto p-4 text-sm leading-6 text-slate-100">
@@ -138,6 +243,42 @@ function CodeBlock({ code }: { code: string }) {
 
 export default function DevelopersPage() {
   const [lang, setLang] = useState<Lang>("curl");
+  const [schema, setSchema] = useState<OpenApiSchema | null>(null);
+  const [schemaError, setSchemaError] = useState(false);
+  const [schemaLoading, setSchemaLoading] = useState(true);
+  const [query, setQuery] = useState("");
+
+  const loadSchema = async () => {
+    setSchemaLoading(true);
+    setSchemaError(false);
+    try {
+      const response = await fetch("/openapi.json", { cache: "no-store" });
+      if (!response.ok) throw new Error(`OpenAPI ${response.status}`);
+      setSchema(await response.json());
+    } catch {
+      setSchema(null);
+      setSchemaError(true);
+    } finally {
+      setSchemaLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadSchema();
+  }, []);
+
+  const endpoints = useMemo(() => endpointsFromOpenApi(schema), [schema]);
+  const tags = useMemo(() => Array.from(new Set(endpoints.map((endpoint) => endpoint.tag ?? "General"))).sort(), [endpoints]);
+  const filteredEndpoints = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return endpoints;
+    return endpoints.filter((endpoint) =>
+      [endpoint.method, endpoint.path, endpoint.scope, endpoint.desc, endpoint.tag]
+        .join(" ")
+        .toLowerCase()
+        .includes(needle)
+    );
+  }, [endpoints, query]);
 
   return (
     <div className="bg-[#F6F8FB] text-gray-900">
@@ -152,15 +293,26 @@ export default function DevelopersPage() {
               API de donnees ouvertes pour le Burkina Faso
             </h1>
             <p className="mt-5 max-w-2xl text-base leading-7 text-slate-300">
-              Consultez le catalogue, interrogez les donnees geographiques, automatisez les imports et lancez des exports depuis vos outils terrain, SIG ou tableaux de bord.
+              Consultez une documentation maintenue depuis OpenAPI, interrogez le catalogue, automatisez les imports et lancez des exports depuis vos outils terrain, SIG ou tableaux de bord.
             </p>
+            <div className="mt-5 flex flex-wrap gap-2 text-xs font-semibold text-slate-300">
+              <span className="rounded-full bg-white/10 px-3 py-1 ring-1 ring-white/10">
+                {schema?.info?.title ?? "FasoData API"}
+              </span>
+              <span className="rounded-full bg-white/10 px-3 py-1 ring-1 ring-white/10">
+                Version {schema?.info?.version ?? "1.0.0"}
+              </span>
+              <span className="rounded-full bg-white/10 px-3 py-1 ring-1 ring-white/10">
+                OpenAPI {schema?.openapi ?? "3.x"}
+              </span>
+            </div>
             <div className="mt-8 flex flex-wrap gap-3">
               <a href="#quickstart" className="inline-flex items-center gap-2 rounded-xl bg-[#E04E2F] px-5 py-3 text-sm font-bold text-white">
                 <Terminal className="h-4 w-4" /> Demarrer
               </a>
-              <Link href="/docs" className="inline-flex items-center gap-2 rounded-xl border border-white/15 px-5 py-3 text-sm font-bold text-white/90">
-                <BookOpen className="h-4 w-4" /> OpenAPI
-              </Link>
+              <a href="/docs" className="inline-flex items-center gap-2 rounded-xl border border-white/15 px-5 py-3 text-sm font-bold text-white/90">
+                <BookOpen className="h-4 w-4" /> Swagger UI
+              </a>
             </div>
           </div>
 
@@ -175,10 +327,10 @@ export default function DevelopersPage() {
 
       <section className="mx-auto grid max-w-7xl gap-4 px-4 py-8 sm:px-6 md:grid-cols-4 lg:px-8">
         {[
-          { label: "Disponibilite cible", value: "99.5%", icon: Shield },
+          { label: "Version API", value: schema?.info?.version ?? "1.0.0", icon: Server },
+          { label: "Endpoints", value: String(endpoints.length), icon: Shield },
           { label: "Limite dev", value: "30 req/s", icon: Timer },
           { label: "Pagination max", value: "100 lignes", icon: Layers },
-          { label: "Formats", value: "JSON, CSV", icon: Braces },
         ].map(({ label, value, icon: Icon }) => (
           <div key={label} className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
             <Icon className="h-5 w-5 text-[#E04E2F]" />
@@ -195,7 +347,9 @@ export default function DevelopersPage() {
               ["Quickstart", "#quickstart"],
               ["Authentification", "#auth"],
               ["Quotas", "#quotas"],
+              ["Versions", "#versions"],
               ["Endpoints", "#endpoints"],
+              ["SDK snippets", "#sdk"],
               ["Erreurs", "#errors"],
             ].map(([label, href]) => (
               <a key={href} href={href} className="block rounded-xl px-3 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50 hover:text-gray-900">
@@ -205,7 +359,7 @@ export default function DevelopersPage() {
           </div>
         </aside>
 
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           <section id="quickstart" className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
@@ -241,7 +395,7 @@ export default function DevelopersPage() {
                 <p className="mt-1 font-mono text-xs">Authorization: Bearer &lt;access_token&gt;</p>
               </div>
             </div>
-            <div id="quotas" className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+              <div id="quotas" className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
               <Timer className="h-5 w-5 text-[#E04E2F]" />
               <h2 className="mt-4 text-xl font-bold text-gray-900">Quotas & limites</h2>
               <div className="mt-4 space-y-3 text-sm text-gray-600">
@@ -253,30 +407,90 @@ export default function DevelopersPage() {
             </div>
           </section>
 
+          <section id="versions" className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+            <div className="flex items-center gap-3">
+              <Server className="h-5 w-5 text-[#E04E2F]" />
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Versions & maintenance</h2>
+                <p className="mt-1 text-sm text-gray-500">
+                  La reference ci-dessous est generee depuis le schema OpenAPI expose par le backend.
+                </p>
+              </div>
+            </div>
+            <div className="mt-5 grid gap-3 md:grid-cols-2">
+              {API_VERSIONS.map((item) => (
+                <div key={item.version} className="rounded-xl border border-gray-100 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-mono text-sm font-bold text-gray-900">{item.version}</span>
+                    <span className="rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600">{item.status}</span>
+                  </div>
+                  <p className="mt-2 text-sm leading-6 text-gray-600">{item.text}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+
           <section id="endpoints" className="rounded-2xl border border-gray-100 bg-white shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-100 p-6">
               <div>
                 <h2 className="text-2xl font-bold text-gray-900">Reference endpoints</h2>
-                <p className="mt-1 text-sm text-gray-500">Routes actuellement exposees par le backend FasoData.</p>
+                <p className="mt-1 text-sm text-gray-500">
+                  {schemaError
+                    ? "OpenAPI indisponible : affichage de secours depuis la derniere reference connue."
+                    : "Routes chargees automatiquement depuis /openapi.json."}
+                </p>
               </div>
-              <div className="flex gap-2">
-                <Link href="/openapi.json" className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-bold text-gray-700">
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={loadSchema}
+                  className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-bold text-gray-700"
+                  disabled={schemaLoading}
+                >
+                  <RefreshCw className={cn("h-4 w-4", schemaLoading && "animate-spin")} /> Synchroniser
+                </button>
+                <a href="/openapi.json" className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-bold text-gray-700">
                   <Download className="h-4 w-4" /> Schema
-                </Link>
+                </a>
               </div>
             </div>
+            <div className="flex flex-col gap-3 border-b border-gray-100 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="relative w-full sm:max-w-sm">
+                <label htmlFor="endpoint-search" className="sr-only">Rechercher un endpoint</label>
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <input
+                  id="endpoint-search"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Filtrer par route, methode, tag..."
+                  className="w-full rounded-xl border border-gray-200 py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#E04E2F]/20"
+                />
+              </div>
+              <div className="flex flex-wrap gap-2 text-xs text-gray-500">
+                {tags.slice(0, 6).map((tag) => (
+                  <span key={tag} className="rounded-full bg-gray-100 px-2.5 py-1 font-semibold">{tag}</span>
+                ))}
+              </div>
+            </div>
+            {schemaError && (
+              <div className="mx-6 mt-5 flex gap-3 rounded-xl border border-amber-100 bg-amber-50 p-4 text-sm text-amber-900">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <p>Le schema OpenAPI n'a pas pu etre charge. La reference reste lisible, mais elle peut etre moins a jour que le backend.</p>
+              </div>
+            )}
             <div className="overflow-x-auto">
               <table className="w-full min-w-[820px] text-left text-sm">
                 <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-400">
                   <tr>
                     <th className="px-5 py-3">Methode</th>
                     <th className="px-5 py-3">Endpoint</th>
+                    <th className="px-5 py-3">Tag</th>
                     <th className="px-5 py-3">Acces</th>
                     <th className="px-5 py-3">Description</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {ENDPOINTS.map((endpoint) => (
+                  {filteredEndpoints.map((endpoint) => (
                     <tr key={`${endpoint.method}-${endpoint.path}`} className="align-top">
                       <td className="px-5 py-3">
                         <span className={cn("rounded-lg px-2 py-1 text-xs font-bold ring-1", METHOD_COLORS[endpoint.method] ?? "bg-gray-50 text-gray-700 ring-gray-100")}>
@@ -284,14 +498,47 @@ export default function DevelopersPage() {
                         </span>
                       </td>
                       <td className="px-5 py-3 font-mono text-xs text-gray-900">{endpoint.path}</td>
+                      <td className="px-5 py-3 text-xs font-semibold text-gray-500">{endpoint.tag ?? "General"}</td>
                       <td className="px-5 py-3">
                         <span className="rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600">{endpoint.scope}</span>
                       </td>
                       <td className="px-5 py-3 text-gray-600">{endpoint.desc}</td>
                     </tr>
                   ))}
+                  {!filteredEndpoints.length && (
+                    <tr>
+                      <td colSpan={5} className="px-5 py-12 text-center text-sm text-gray-400">
+                        Aucun endpoint ne correspond a ce filtre.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
+            </div>
+          </section>
+
+          <section id="sdk" className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">SDK snippets</h2>
+                <p className="mt-1 text-sm text-gray-500">Bases reutilisables pour integrer FasoData dans un service ou un notebook.</p>
+              </div>
+              <div className="flex rounded-xl bg-gray-100 p-1">
+                {(["curl", "python", "javascript"] as Lang[]).map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => setLang(item)}
+                    className={cn("rounded-lg px-3 py-1.5 text-xs font-bold capitalize", lang === item ? "bg-white text-[#E04E2F] shadow-sm" : "text-gray-500")}
+                    aria-pressed={lang === item}
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="mt-5">
+              <CodeBlock code={SDK_SNIPPETS[lang]} />
             </div>
           </section>
 

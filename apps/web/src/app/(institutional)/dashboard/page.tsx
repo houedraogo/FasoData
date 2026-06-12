@@ -18,6 +18,8 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { FocusTrap } from "@/components/ui/FocusTrap";
+import { DataOriginBadge } from "@/components/ui/DataOriginBadge";
 import toast from "react-hot-toast";
 
 // ── Sparkline mini ────────────────────────────────────────────────────────────
@@ -238,6 +240,7 @@ type DatasetListItem = {
   name: string;
   description?: string | null;
   source?: string | null;
+  data_origin?: string | null;
   file_format?: string | null;
   row_count?: number | null;
   updated_at: string;
@@ -254,8 +257,6 @@ type RegionSummary = {
   avg_price: number;
   latest_date?: string | null;
 };
-
-const PREFERENCES_KEY = "fasodata.dashboard.preferences";
 
 const DEFAULT_PREFERENCES: DashboardPreferences = {
   domains: ["prices"],
@@ -279,14 +280,6 @@ const DATA_TYPE_OPTIONS = [
 ];
 
 const WATCH_REGIONS = ["National", "Sahel", "Centre", "Est", "Hauts-Bassins", "Nord", "Centre-Nord", "Boucle du Mouhoun"];
-
-const RECOMMENDATIONS = [
-  { domain: "prices", title: "Suivi des prix alimentaires", text: "Comparer les prix WFP par marché, produit et pays.", href: "/dashboard/prix", icon: Wheat },
-  { domain: "territory", title: "Carte interactive", text: "Explorer les indicateurs par région et calques.", href: "/carte", icon: MapIcon },
-  { domain: "water", title: "Datasets eau & assainissement", text: "Repérer les données ouvertes utiles au suivi terrain.", href: "/datasets?theme=eau", icon: Database },
-  { domain: "health", title: "Indicateurs santé", text: "Préparer le suivi vaccination, nutrition et alertes sanitaires.", href: "/datasets?theme=sante", icon: HeartPulse },
-  { domain: "education", title: "Indicateurs éducation", text: "Suivre écoles équipées, zones rurales et livrables.", href: "/datasets?theme=education", icon: ClipboardCheck },
-];
 
 const RECOMMENDATION_ICONS = {
   wheat: Wheat,
@@ -312,7 +305,7 @@ function toClientPreferences(preferences: DashboardPreferencesApi): DashboardPre
 export default function DashboardPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { user, fetchMe } = useAuth();
+  const { user } = useAuth();
   const [showNouveauProg, setShowNouveauProg] = useState(false);
   const [isEditingPreferences, setIsEditingPreferences] = useState(false);
   const [draftPreferences, setDraftPreferences] = useState<DashboardPreferences>(DEFAULT_PREFERENCES);
@@ -332,7 +325,12 @@ export default function DashboardPage() {
     },
     enabled: Boolean(user),
   });
-  const { data: recommendationData } = useQuery<DashboardRecommendation[]>({
+  const {
+    data: recommendationData,
+    isError: isRecommendationsError,
+    isLoading: isRecommendationsLoading,
+    refetch: refetchRecommendations,
+  } = useQuery<DashboardRecommendation[]>({
     queryKey: ["dashboard-recommendations", preferenceRecord?.updated_at],
     queryFn: async () => {
       const { data } = await api.get("/dashboard/recommendations");
@@ -377,7 +375,6 @@ export default function DashboardPage() {
       queryClient.setQueryData(["dashboard-preferences"], saved);
       queryClient.invalidateQueries({ queryKey: ["dashboard-overview"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-recommendations"] });
-      if (typeof window !== "undefined") window.localStorage.removeItem(PREFERENCES_KEY);
       setIsEditingPreferences(false);
       toast.success("Tableau de bord personnalisé");
     },
@@ -421,27 +418,14 @@ export default function DashboardPage() {
 
   const hasPrograms = programmesData.length > 0;
   const preferences = preferenceRecord?.is_configured ? toClientPreferences(preferenceRecord) : null;
-  const activePreferences = preferences ?? draftPreferences;
+  const activePreferences = preferences ?? DEFAULT_PREFERENCES;
   const selectedDomainLabels = DOMAIN_OPTIONS
     .filter((domain) => activePreferences.domains.includes(domain.id))
     .map((domain) => domain.label);
   const selectedDataTypeLabels = DATA_TYPE_OPTIONS
     .filter((type) => activePreferences.dataTypes.includes(type.id))
     .map((type) => type.label);
-  const recommendedItems = RECOMMENDATIONS
-    .filter((item) => activePreferences.domains.includes(item.domain))
-    .slice(0, 4);
-  const displayedRecommendations = recommendationData?.length ? recommendationData : recommendedItems.map((item) => ({
-    key: item.title,
-    title: item.title,
-    text: item.text,
-    href: item.href,
-    kind: "fallback",
-    source: "Catalogue FasoData",
-    metric: null,
-    detail: null,
-    icon: item.domain === "prices" ? "wheat" : item.domain === "territory" ? "map" : item.domain === "health" ? "health" : item.domain === "education" ? "education" : "database",
-  }));
+  const displayedRecommendations = recommendationData ?? [];
 
   // Formulaire nouveau programme
   const [prog, setProg] = useState({
@@ -450,31 +434,8 @@ export default function DashboardPage() {
   });
 
   useEffect(() => {
-    fetchMe().then(() => {
-      const u = useAuth.getState().user;
-      if (!u) router.push("/auth/connexion");
-      else if (u.role === "admin") router.push("/admin");
-    });
-  }, []);
-
-  useEffect(() => {
     if (!preferenceRecord) return;
     setDraftPreferences(toClientPreferences(preferenceRecord));
-  }, [preferenceRecord]);
-
-  useEffect(() => {
-    if (!preferenceRecord || preferenceRecord.is_configured || typeof window === "undefined") return;
-    const saved = window.localStorage.getItem(PREFERENCES_KEY);
-    if (!saved) return;
-    try {
-      const parsed = JSON.parse(saved) as DashboardPreferences;
-      if (parsed.domains?.length && parsed.dataTypes?.length && parsed.regions?.length) {
-        setDraftPreferences(parsed);
-        savePreferencesMutation.mutate(parsed);
-      }
-    } catch {
-      window.localStorage.removeItem(PREFERENCES_KEY);
-    }
   }, [preferenceRecord]);
 
   if (!user) return null;
@@ -863,7 +824,7 @@ export default function DashboardPage() {
               <div className="h-[220px] flex flex-col items-center justify-center text-center text-gray-400">
                 <BarChart3 className="w-8 h-8 mb-2 text-gray-300" />
                 <p className="text-sm font-medium text-gray-600">Aucun indicateur terrain disponible</p>
-                <p className="text-xs mt-1">Les graphiques apparaîtront après ingestion ou agrégation de données.</p>
+                <p className="text-xs mt-1">Les graphiques apparaîtront après ingestion ou agrégation de données vérifiées.</p>
               </div>
             )}
           </div>
@@ -881,37 +842,80 @@ export default function DashboardPage() {
                 Catalogue
               </Link>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {displayedRecommendations.map((item) => {
-                const Icon = RECOMMENDATION_ICONS[item.icon as keyof typeof RECOMMENDATION_ICONS] ?? Database;
-                return (
-                  <Link
-                    key={item.key}
-                    href={item.href}
-                    className="border border-gray-100 rounded-xl p-4 hover:border-[#1A2C42]/20 hover:bg-gray-50/60 transition-colors"
-                  >
-                    <div className="flex items-start justify-between gap-3 mb-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="w-8 h-8 rounded-lg bg-[#1A2C42]/5 text-[#1A2C42] flex items-center justify-center shrink-0">
-                          <Icon className="w-4 h-4" />
-                        </span>
-                        <p className="text-sm font-semibold text-gray-900 leading-snug">{item.title}</p>
+            {isRecommendationsLoading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {[0, 1, 2, 3].map((item) => (
+                  <div key={item} className="border border-gray-100 rounded-xl p-4 animate-pulse">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="w-8 h-8 rounded-lg bg-gray-100" />
+                      <span className="h-4 w-40 bg-gray-100 rounded" />
+                    </div>
+                    <div className="space-y-2">
+                      <span className="block h-3 w-full bg-gray-100 rounded" />
+                      <span className="block h-3 w-2/3 bg-gray-100 rounded" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : isRecommendationsError ? (
+              <div className="py-10 text-center text-gray-400 border border-dashed border-gray-200 rounded-xl">
+                <AlertTriangle className="w-8 h-8 mx-auto mb-2 text-amber-400" />
+                <p className="text-sm font-medium text-gray-600">Recommandations indisponibles</p>
+                <p className="text-xs mt-1">L'API n'a pas pu charger les recommandations personnalisées.</p>
+                <button
+                  type="button"
+                  onClick={() => refetchRecommendations()}
+                  className="inline-flex mt-3 text-xs font-semibold text-[#E04E2F] hover:underline"
+                >
+                  Réessayer
+                </button>
+              </div>
+            ) : displayedRecommendations.length ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {displayedRecommendations.map((item) => {
+                  const Icon = RECOMMENDATION_ICONS[item.icon as keyof typeof RECOMMENDATION_ICONS] ?? Database;
+                  return (
+                    <Link
+                      key={item.key}
+                      href={item.href}
+                      className="border border-gray-100 rounded-xl p-4 hover:border-[#1A2C42]/20 hover:bg-gray-50/60 transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-3 mb-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="w-8 h-8 rounded-lg bg-[#1A2C42]/5 text-[#1A2C42] flex items-center justify-center shrink-0">
+                            <Icon className="w-4 h-4" />
+                          </span>
+                          <p className="text-sm font-semibold text-gray-900 leading-snug">{item.title}</p>
+                        </div>
+                        {item.metric && (
+                          <span className="text-[10px] font-bold text-[#E04E2F] bg-red-50 px-2 py-1 rounded-lg shrink-0">
+                            {item.metric}
+                          </span>
+                        )}
                       </div>
-                      {item.metric && (
-                        <span className="text-[10px] font-bold text-[#E04E2F] bg-red-50 px-2 py-1 rounded-lg shrink-0">
-                          {item.metric}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-gray-400 leading-relaxed">{item.text}</p>
-                    <div className="flex items-center justify-between gap-3 mt-3 pt-3 border-t border-gray-50">
-                      <span className="text-[10px] text-gray-400 truncate">{item.source}</span>
-                      {item.detail && <span className="text-[10px] font-medium text-gray-500 truncate">{item.detail}</span>}
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
+                      <p className="text-xs text-gray-400 leading-relaxed">{item.text}</p>
+                      <div className="flex items-center justify-between gap-3 mt-3 pt-3 border-t border-gray-50">
+                        <span className="text-[10px] text-gray-400 truncate">{item.source}</span>
+                        {item.detail && <span className="text-[10px] font-medium text-gray-500 truncate">{item.detail}</span>}
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="py-10 text-center text-gray-400 border border-dashed border-gray-200 rounded-xl">
+                <Database className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+                <p className="text-sm font-medium text-gray-600">Aucune recommandation disponible</p>
+                <p className="text-xs mt-1">Ajoutez des préférences ou publiez des données vérifiées correspondant à vos priorités.</p>
+                <button
+                  type="button"
+                  onClick={() => setIsEditingPreferences(true)}
+                  className="inline-flex mt-3 text-xs font-semibold text-[#E04E2F] hover:underline"
+                >
+                  Modifier mes préférences
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -979,7 +983,7 @@ export default function DashboardPage() {
               <div className="py-10 text-center text-gray-400">
                 <MapIcon className="w-8 h-8 mx-auto mb-2 text-gray-300" />
                 <p className="text-sm font-medium text-gray-600">Aucune donnée régionale</p>
-                <p className="text-xs mt-1">La répartition apparaîtra après collecte ou import de données.</p>
+                <p className="text-xs mt-1">La répartition apparaîtra après collecte ou import de données vérifiées.</p>
               </div>
             )}
           </div>
@@ -1045,6 +1049,7 @@ export default function DashboardPage() {
                         <p className="text-[10px] text-gray-400 mt-0.5">
                           {dataset.source ?? "FasoData"} · {dataset.row_count?.toLocaleString("fr-FR") ?? "0"} lignes
                         </p>
+                        <DataOriginBadge origin={dataset.data_origin} compact className="mt-1" />
                       </div>
                       <span className={cn("text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0", FORMAT_COLORS[format] ?? "bg-gray-100 text-gray-500")}>
                         {format}
@@ -1055,8 +1060,8 @@ export default function DashboardPage() {
               ) : (
                 <div className="py-10 text-center text-gray-400">
                   <FileText className="w-8 h-8 mx-auto mb-2 text-gray-300" />
-                  <p className="text-sm font-medium text-gray-600">Aucun dataset publié</p>
-                  <p className="text-xs mt-1">Les publications récentes apparaîtront ici.</p>
+                  <p className="text-sm font-medium text-gray-600">Aucun dataset vérifié publié</p>
+                  <p className="text-xs mt-1">Les publications récentes vérifiées apparaîtront ici.</p>
                 </div>
               )
             ) : (
@@ -1102,22 +1107,23 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Modal : Nouveau programme ──────────────────────────────────────── */}
-      <div style={{ display: showNouveauProg ? "flex" : "none" }} className="fixed inset-0 z-[9999] items-center justify-center"><div className="absolute inset-0 bg-black/50" onClick={() => setShowNouveauProg(false)} /><div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-y-auto max-h-[90vh]"><div className="flex items-center justify-between px-6 py-4 border-b border-gray-100"><h2 className="font-bold text-gray-900">Créer un nouveau programme</h2><button onClick={() => setShowNouveauProg(false)} className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg"><X className="w-4 h-4" /></button></div><div className="px-6 py-5">
+      {showNouveauProg && (
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center"><button type="button" className="absolute inset-0 bg-black/50" onClick={() => setShowNouveauProg(false)} aria-label="Fermer la modale" /><FocusTrap onEscape={() => setShowNouveauProg(false)} labelledBy="program-modal-title" className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-y-auto max-h-[90vh]"><div className="flex items-center justify-between px-6 py-4 border-b border-gray-100"><h2 id="program-modal-title" className="font-bold text-gray-900">Créer un nouveau programme</h2><button type="button" onClick={() => setShowNouveauProg(false)} className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg" aria-label="Fermer"><X className="w-4 h-4" /></button></div><div className="px-6 py-5">
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
+            <label htmlFor="program-name" className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
               Nom du programme <span className="text-[#E04E2F]">*</span>
             </label>
-            <input type="text" value={prog.nom}
+            <input id="program-name" type="text" value={prog.nom}
               onChange={(e) => setProg((p) => ({ ...p, nom: e.target.value }))}
               placeholder="ex: Nutrition Sahel 2025"
               className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1A2C42]/20" />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Type</label>
+            <label htmlFor="program-type" className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Type</label>
             <div className="relative">
-              <select value={prog.type} onChange={(e) => setProg((p) => ({ ...p, type: e.target.value }))}
+              <select id="program-type" value={prog.type} onChange={(e) => setProg((p) => ({ ...p, type: e.target.value }))}
                 className="w-full appearance-none px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1A2C42]/20">
                 {PROG_TYPES.map((t) => <option key={t}>{t}</option>)}
               </select>
@@ -1126,14 +1132,15 @@ export default function DashboardPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Régions ciblées</label>
-            <div className="flex flex-wrap gap-2">
+            <span id="program-regions-label" className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Régions ciblées</span>
+            <div className="flex flex-wrap gap-2" role="group" aria-labelledby="program-regions-label">
               {REGIONS_SELECT.map((r) => (
                 <button key={r} type="button"
                   onClick={() => setProg((p) => ({
                     ...p,
                     regions: p.regions.includes(r) ? p.regions.filter((x) => x !== r) : [...p.regions, r],
                   }))}
+                  aria-pressed={prog.regions.includes(r)}
                   className={cn("px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors",
                     prog.regions.includes(r)
                       ? "bg-[#1A2C42] text-white border-[#1A2C42]"
@@ -1146,22 +1153,22 @@ export default function DashboardPage() {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Début</label>
-              <input type="date" value={prog.debut}
+              <label htmlFor="program-start" className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Début</label>
+              <input id="program-start" type="date" value={prog.debut}
                 onChange={(e) => setProg((p) => ({ ...p, debut: e.target.value }))}
                 className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1A2C42]/20" />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Fin</label>
-              <input type="date" value={prog.fin}
+              <label htmlFor="program-end" className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Fin</label>
+              <input id="program-end" type="date" value={prog.fin}
                 onChange={(e) => setProg((p) => ({ ...p, fin: e.target.value }))}
                 className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1A2C42]/20" />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Objectif chiffré</label>
-            <input type="text" value={prog.objectif}
+            <label htmlFor="program-goal" className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Objectif chiffré</label>
+            <input id="program-goal" type="text" value={prog.objectif}
               onChange={(e) => setProg((p) => ({ ...p, objectif: e.target.value }))}
               placeholder="ex: 15 000 bénéficiaires"
               className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1A2C42]/20" />
@@ -1181,7 +1188,8 @@ export default function DashboardPage() {
             </button>
           </div>
         </div>
-      </div></div></div>
+      </div></FocusTrap></div>
+      )}
     </div>
   );
 }

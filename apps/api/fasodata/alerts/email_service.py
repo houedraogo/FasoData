@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 COMMODITY_LABELS = {
     "sorghum":    "Sorgho blanc",
     "rice_local": "Riz local décortiqué",
+    "rice_imported": "Riz importé",
     "maize":      "Maïs",
     "millet":     "Mil pénicillaire",
     "cowpea":     "Niébé",

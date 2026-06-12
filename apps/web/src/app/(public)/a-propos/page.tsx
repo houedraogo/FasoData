@@ -2,6 +2,7 @@ import Link from "next/link";
 import {
   Database, Globe, Shield, Users, BarChart3,
   Mail, Github, ExternalLink, CheckCircle, ArrowRight,
+  GraduationCap, Building2, Landmark,
 } from "lucide-react";
 
 // ── Données statiques ─────────────────────────────────────────────────────────
@@ -145,6 +146,51 @@ export default function AProposPage() {
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="py-16 bg-gray-50 border-y border-gray-100">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="max-w-2xl mb-10">
+            <h2 className="text-3xl font-bold text-faso-navy mb-3">À qui s'adresse FasoData ?</h2>
+            <p className="text-gray-600 leading-relaxed">
+              FasoData est construit pour quatre grandes familles d'utilisateurs qui ont besoin
+              de données fiables pour chercher, analyser, piloter ou décider.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {[
+              {
+                icon: GraduationCap,
+                title: "Étudiants, universités et chercheurs",
+                desc: "Accéder à des données fiables pour conduire des recherches académiques, produire des analyses citées et comparer les territoires dans le temps.",
+              },
+              {
+                icon: Building2,
+                title: "Entreprises",
+                desc: "Mieux comprendre un secteur, évaluer une zone, suivre les tendances et préparer des études de marché fondées sur des données exploitables.",
+              },
+              {
+                icon: Users,
+                title: "ONG",
+                desc: "Suivre des indicateurs d'impact, documenter les programmes, surveiller les prix et adapter les interventions aux réalités du terrain.",
+              },
+              {
+                icon: Landmark,
+                title: "État et institutions publiques",
+                desc: "Observer les indicateurs clés, notamment les prix des produits, pour orienter les politiques publiques et prendre des décisions éclairées.",
+              },
+            ].map(({ icon: Icon, title, desc }) => (
+              <div key={title} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+                <div className="w-11 h-11 bg-faso-navy/10 rounded-xl flex items-center justify-center mb-4">
+                  <Icon className="w-5 h-5 text-faso-navy" />
+                </div>
+                <h3 className="font-bold text-gray-900 mb-2">{title}</h3>
+                <p className="text-sm text-gray-500 leading-relaxed">{desc}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>

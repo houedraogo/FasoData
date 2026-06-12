@@ -12,6 +12,7 @@ class DatasetBase(BaseModel):
     category: str | None = None
     tags: list[str] = []
     source: str | None = None
+    data_origin: str = "user_upload"
     license: DatasetLicense = DatasetLicense.open
 
 
@@ -25,6 +26,7 @@ class DatasetUpdate(BaseModel):
     category: str | None = None
     tags: list[str] | None = None
     source: str | None = None
+    data_origin: str | None = None
     license: DatasetLicense | None = None
     status: DatasetStatus | None = None
 

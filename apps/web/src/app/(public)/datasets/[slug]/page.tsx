@@ -14,6 +14,7 @@ import { api } from "@/lib/api";
 import { formatBytes, formatDate, formatNumber } from "@/lib/utils";
 import { DataPreviewTable } from "@/components/datasets/DataPreviewTable";
 import { DatasetStatsPanel } from "@/components/datasets/DatasetStatsPanel";
+import { DataOriginBadge } from "@/components/ui/DataOriginBadge";
 import toast from "react-hot-toast";
 
 type Dataset = {
@@ -24,6 +25,7 @@ type Dataset = {
   category: string | null;
   tags: string[];
   source: string | null;
+  data_origin?: string | null;
   license: string;
   status: string;
   is_geo: boolean;
@@ -147,6 +149,7 @@ export default function DatasetDetailPage() {
                 <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${license.color}`}>
                   {license.label}
                 </span>
+                <DataOriginBadge origin={dataset.data_origin} compact className="bg-white/95" />
                 {dataset.is_geo && (
                   <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-teal-100 text-teal-700 border border-teal-200">
                     🗺️ Géospatial
@@ -301,6 +304,7 @@ export default function DatasetDetailPage() {
                 {dataset.source && (
                   <InfoRow label="Source" value={dataset.source} />
                 )}
+                <InfoRow label="Origine" value={<DataOriginBadge origin={dataset.data_origin} compact />} />
                 <InfoRow label="Licence" value={
                   <span className={`badge border ${license.color}`}>{license.label}</span>
                 } />

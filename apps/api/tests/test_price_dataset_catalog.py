@@ -3,19 +3,21 @@ from datetime import date
 import pytest
 
 from fasodata.datasets.router import PRICE_DATASET_SLUG
+from fasodata.datasets import router as datasets_router
 from fasodata.prices.models import PriceData
 
 
-async def create_price(db_session):
+async def create_price(db_session, *, data_origin: str = "public", price: float = 285):
     row = PriceData(
         commodity="sorghum",
         region="Sahel",
         market="Dori",
-        price=285,
+        price=price,
         unit="CFA/kg",
         quality="retail",
         price_date=date(2026, 5, 18),
         source="wfp",
+        data_origin=data_origin,
         reporter="WFP DataBridges",
         validation_status="auto",
         notes="test price row",
@@ -79,3 +81,19 @@ async def test_price_dataset_download_streams_csv(client, db_session):
     assert "prix-alimentaires-burkina-faso.csv" in resp.headers["content-disposition"]
     assert "commodity,region,market,price" in resp.text
     assert "sorghum,Sahel,Dori,285" in resp.text
+
+
+@pytest.mark.asyncio
+async def test_price_dataset_hides_seed_rows_in_production(client, db_session, monkeypatch):
+    monkeypatch.setattr(datasets_router.settings, "environment", "production")
+    await create_price(db_session, data_origin="seed", price=999)
+    await create_price(db_session, data_origin="public", price=285)
+
+    resp = await client.get(f"/api/datasets/{PRICE_DATASET_SLUG}/preview")
+
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["total_rows"] == 1
+    assert len(data["rows"]) == 1
+    assert data["rows"][0]["price"] == 285
+    assert data["rows"][0]["data_origin"] == "public"

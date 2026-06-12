@@ -120,7 +120,7 @@ function Field({ label, error, children }: { label: string; error?: string; chil
 }
 
 const COMMODITY_LABELS: Record<string, string> = {
-  sorghum: "Sorgho", rice_local: "Riz local", maize: "Maïs",
+  sorghum: "Sorgho", rice_local: "Riz local", rice_imported: "Riz importé", maize: "Maïs",
   millet: "Mil", cowpea: "Niébé", groundnut: "Arachide",
 };
 

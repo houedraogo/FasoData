@@ -68,7 +68,7 @@ export function Navbar() {
             </div>
           </Link>
 
-          <div className="hidden md:flex items-center gap-1">
+          <div className="hidden lg:flex items-center gap-1">
             {navLinks.map(({ href, labelKey }) => (
               <Link
                 key={href}
@@ -85,7 +85,7 @@ export function Navbar() {
             ))}
           </div>
 
-          <div className="hidden md:flex items-center gap-3">
+          <div className="hidden lg:flex items-center gap-3">
             <LanguageToggle />
             {user ? (
               <>
@@ -119,7 +119,7 @@ export function Navbar() {
 
           <button
             type="button"
-            className="md:hidden text-white/80 hover:text-white"
+            className="lg:hidden text-white/80 hover:text-white"
             onClick={() => setMenuOpen(!menuOpen)}
             aria-label={menuOpen ? "Close menu" : "Open menu"}
             aria-expanded={menuOpen}
@@ -129,7 +129,7 @@ export function Navbar() {
         </div>
 
         {menuOpen && (
-          <div className="md:hidden py-4 border-t border-white/10 space-y-1">
+          <div className="lg:hidden py-4 border-t border-white/10 space-y-1">
             {navLinks.map(({ href, labelKey, icon: Icon }) => (
               <Link
                 key={href}

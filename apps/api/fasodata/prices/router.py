@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from fasodata.auth.deps import get_current_active_user, require_admin, require_institutional
 from fasodata.core.config import get_settings
+from fasodata.core.data_origin import visible_origin_filter
 from fasodata.core.database import get_db
 from fasodata.prices import at_service
 from fasodata.prices.at_service import build_confirmation, build_rejection
@@ -45,6 +46,9 @@ router = APIRouter(prefix="/api/prices", tags=["prices"])
 COMMODITY_ALIASES: dict[str, str] = {
     "sorgho":   "sorghum",
     "sorghum":  "sorghum",
+    "riz importe": "rice_imported",
+    "riz importé": "rice_imported",
+    "rice imported": "rice_imported",
     "riz":      "rice_local",
     "rice":     "rice_local",
     "mais":     "maize",
@@ -60,6 +64,7 @@ COMMODITY_ALIASES: dict[str, str] = {
 COMMODITY_LABELS: dict[str, str] = {
     "sorghum":   "Sorgho",
     "rice_local":"Riz local",
+    "rice_imported":"Riz importé",
     "maize":     "Maïs",
     "millet":    "Mil",
     "cowpea":    "Niébé",
@@ -112,6 +117,11 @@ def _parse_series_sources(value: str | None) -> list[str]:
     return sources or DEFAULT_SERIES_SOURCES
 
 
+def _visible_price_filters() -> list:
+    origin_filter = visible_origin_filter(PriceData.data_origin, settings)
+    return [origin_filter] if origin_filter is not None else []
+
+
 # ── Endpoints ──────────────────────────────────────────────────────────────
 
 @router.get("/commodities")
@@ -119,6 +129,7 @@ async def list_commodities(db: AsyncSession = Depends(get_db)):
     """Liste les produits disponibles avec leur dernier prix."""
     result = await db.execute(
         select(PriceData.commodity, func.max(PriceData.price_date).label("last_date"))
+        .where(*_visible_price_filters())
         .group_by(PriceData.commodity)
     )
     return [
@@ -136,22 +147,22 @@ async def latest_prices(
     """Dernier prix de chaque produit pour une région et un pays."""
     subq = (
         select(PriceData.commodity, func.max(PriceData.price_date).label("max_date"))
-        .where(PriceData.region == region, PriceData.country == country)
+        .where(PriceData.region == region, PriceData.country == country, *_visible_price_filters())
         .group_by(PriceData.commodity)
         .subquery()
     )
     result = await db.execute(
         select(PriceData)
         .join(subq, (PriceData.commodity == subq.c.commodity) & (PriceData.price_date == subq.c.max_date))
-        .where(PriceData.region == region, PriceData.country == country)
+        .where(PriceData.region == region, PriceData.country == country, *_visible_price_filters())
         .order_by(PriceData.commodity)
     )
     rows = result.scalars().all()
     return [PriceDataOut.model_validate(r) for r in rows]
 
 
-@router.get("/compare")
-async def compare_countries(
+@router.get("/compare-overview")
+async def compare_countries_overview(
     commodity: str = Query("maize", description="Produit : sorghum, maize, millet…"),
     region:    str = Query("National"),
     db: AsyncSession = Depends(get_db),
@@ -170,7 +181,8 @@ async def compare_countries(
             select(func.max(PriceData.price_date).label("max_date"))
             .where(PriceData.commodity == commodity,
                    PriceData.region    == region,
-                   PriceData.country   == country)
+                   PriceData.country   == country,
+                   *_visible_price_filters())
             .subquery()
         )
         row = (await db.execute(
@@ -178,7 +190,8 @@ async def compare_countries(
             .where(PriceData.commodity == commodity,
                    PriceData.region    == region,
                    PriceData.country   == country,
-                   PriceData.price_date == subq.c.max_date)
+                   PriceData.price_date == subq.c.max_date,
+                   *_visible_price_filters())
             .limit(1)
         )).scalar_one_or_none()
 
@@ -202,6 +215,7 @@ async def compare_countries(
             PriceData.commodity == commodity,
             PriceData.region    == region,
             PriceData.country.in_(countries),
+            *_visible_price_filters(),
         )
         .group_by(PriceData.country, func.extract("year", PriceData.price_date))
         .order_by(PriceData.country, "year")
@@ -263,6 +277,7 @@ async def price_series(
         PriceData.commodity == commodity,
         PriceData.region    == region,
         PriceData.source.in_(selected_sources),
+        *_visible_price_filters(),
         or_(
             PriceData.validation_status.in_(SERIES_VALID_STATUSES),
             and_(
@@ -342,7 +357,7 @@ async def list_prices(
     db: AsyncSession = Depends(get_db),
 ):
     """Liste paginée des relevés bruts."""
-    q = select(PriceData)
+    q = select(PriceData).where(*_visible_price_filters())
     if commodity:
         commodity = COMMODITY_ALIASES.get(commodity.lower(), commodity)
         q = q.where(PriceData.commodity == commodity)
@@ -374,6 +389,7 @@ async def add_price(
 ):
     """Ajouter un relevé de prix (opérateur institutionnel)."""
     data.commodity = COMMODITY_ALIASES.get(data.commodity.lower(), data.commodity)
+    data.data_origin = "manual"
     row = PriceData(**data.model_dump(), reporter=str(current_user.id))
     db.add(row)
     await db.flush()
@@ -398,6 +414,7 @@ async def ingest_sms(
             detail=f"Format non reconnu : '{payload.message}'. Attendu : <PRODUIT> <REGION> <PRIX>"
         )
     parsed.source = "sms"
+    parsed.data_origin = "field"
     parsed.reporter = payload.from_number
     if payload.received_at:
         parsed.price_date = payload.received_at.date()
@@ -424,6 +441,7 @@ async def ingest_whatsapp(
             detail=f"Format non reconnu : '{payload.message}'. Attendu : <PRODUIT> <REGION> <PRIX>"
         )
     parsed.source = "whatsapp"
+    parsed.data_origin = "field"
     parsed.reporter = payload.wa_id
     if payload.received_at:
         parsed.price_date = payload.received_at.date()
@@ -441,6 +459,7 @@ async def ingest_whatsapp(
 COMMODITY_LABELS_FR: dict[str, str] = {
     "sorghum":    "Sorgho",
     "rice_local": "Riz local",
+    "rice_imported": "Riz importé",
     "maize":      "Maïs",
     "millet":     "Mil",
     "cowpea":     "Niébé",
@@ -487,6 +506,7 @@ async def at_incoming_sms(
         })
 
     parsed.source   = "sms"
+    parsed.data_origin = "field"
     parsed.reporter = from_number
     parsed.notes    = f"AT msg_id={at_msg_id}"
 
@@ -829,7 +849,7 @@ async def aggregation_history(
 async def list_countries(db: AsyncSession = Depends(get_db)):
     """Liste des pays disponibles dans la base."""
     result = await db.execute(
-        select(PriceData.country).distinct().order_by(PriceData.country)
+        select(PriceData.country).where(*_visible_price_filters()).distinct().order_by(PriceData.country)
     )
     countries = [row[0] for row in result.all() if row[0]]
     return [
@@ -865,6 +885,7 @@ async def compare_countries(
             PriceData.commodity == commodity,
             PriceData.country   == country_code,
             PriceData.source.in_(selected_sources),
+            *_visible_price_filters(),
             or_(
                 PriceData.validation_status.in_(SERIES_VALID_STATUSES),
                 and_(

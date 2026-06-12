@@ -1,7 +1,9 @@
-"""Client minimal pour WFP DataBridges /MarketPrices/PriceDaily."""
+"""Clients WFP DataBridges and public HDX food prices."""
 
 from __future__ import annotations
 
+import csv
+import io
 import unicodedata
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -27,11 +29,18 @@ class WfpPriceRecord:
     price_date: date
     raw_commodity: str
     raw_id: str | None = None
+    provider: str = "WFP DataBridges"
+    n_obs: int = 1
+    notes_suffix: str | None = None
 
 
 COMMODITY_ALIASES = {
     "sorgho": "sorghum",
     "sorghum": "sorghum",
+    "rice imported": "rice_imported",
+    "imported rice": "rice_imported",
+    "rice (imported)": "rice_imported",
+    "riz importe": "rice_imported",
     "riz": "rice_local",
     "rice": "rice_local",
     "rice local": "rice_local",
@@ -162,6 +171,37 @@ def parse_wfp_price(row: dict[str, Any]) -> WfpPriceRecord | None:
     )
 
 
+def parse_hdx_price(row: dict[str, Any]) -> WfpPriceRecord | None:
+    raw_commodity = _first(row, "commodity", "cm_name", "commodity_name")
+    commodity = normalize_commodity(raw_commodity)
+    price = _parse_price(_first(row, "price"))
+    price_date = _parse_date(_first(row, "date"))
+
+    if not commodity or price is None or not price_date:
+        return None
+
+    region = _clean(_first(row, "admin1", "region")) or "National"
+    market = _clean(_first(row, "market", "market_name")) or None
+    unit = _clean(_first(row, "unit")) or "CFA/kg"
+    quality = _clean(_first(row, "pricetype", "priceflag", "quality")) or None
+    market_id = _clean(_first(row, "market_id")) or "market"
+    commodity_id = _clean(_first(row, "commodity_id")) or "commodity"
+    raw_id = f"hdx:{market_id}:{commodity_id}:{price_date.isoformat()}"
+
+    return WfpPriceRecord(
+        commodity=commodity,
+        region=region,
+        market=market,
+        price=price,
+        unit=unit,
+        quality=quality,
+        price_date=price_date,
+        raw_commodity=_clean(raw_commodity),
+        raw_id=raw_id,
+        provider="HDX WFP Food Prices",
+    )
+
+
 def _get_access_token(client: httpx.Client) -> str:
     settings = get_settings()
     if not settings.wfp_api_client_id or not settings.wfp_api_client_secret:
@@ -182,8 +222,34 @@ def _get_access_token(client: httpx.Client) -> str:
     return token
 
 
+def fetch_wfp_hdx_prices(start_date: date, end_date: date) -> list[WfpPriceRecord]:
+    settings = get_settings()
+    if not settings.wfp_public_prices_url:
+        raise WfpCredentialsError(
+            "Aucune source publique HDX configuree pour les prix WFP"
+        )
+
+    with httpx.Client(
+        timeout=settings.wfp_prices_timeout_seconds,
+        follow_redirects=True,
+    ) as client:
+        response = client.get(settings.wfp_public_prices_url)
+        response.raise_for_status()
+
+    records: list[WfpPriceRecord] = []
+    reader = csv.DictReader(io.StringIO(response.text))
+    for row in reader:
+        record = parse_hdx_price(row)
+        if record and start_date <= record.price_date <= end_date:
+            records.append(record)
+    return records
+
+
 def fetch_wfp_burkina_prices(start_date: date, end_date: date) -> list[WfpPriceRecord]:
     settings = get_settings()
+    if not settings.wfp_api_client_id or not settings.wfp_api_client_secret:
+        return fetch_wfp_hdx_prices(start_date=start_date, end_date=end_date)
+
     records: list[WfpPriceRecord] = []
     base_url = settings.wfp_api_base_url.rstrip("/")
 

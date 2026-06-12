@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from fasodata.auth.deps import get_current_active_user, require_admin, require_institutional
 from fasodata.core.config import get_settings
+from fasodata.core.data_origin import visible_origin_filter
 from fasodata.core.database import get_db
 from fasodata.datasets.models import Dataset, DatasetLicense, DatasetStatus, ImportJob
 from fasodata.datasets.schemas import (
@@ -40,6 +41,7 @@ PRICE_DATASET_COLUMNS = [
     {"name": "quality", "type": "string", "description": "Type ou qualite du prix"},
     {"name": "price_date", "type": "date", "description": "Date d'observation"},
     {"name": "source", "type": "string", "description": "Source de donnees"},
+    {"name": "data_origin", "type": "string", "description": "Origine de confiance: public, field, user_upload, manual, seed ou simulation"},
     {"name": "reporter", "type": "string", "description": "Collecteur ou systeme source"},
     {"name": "validation_status", "type": "string", "description": "Statut de validation FasoData"},
     {"name": "notes", "type": "string", "description": "Notes techniques"},
@@ -55,11 +57,23 @@ def make_unique_slug(base: str) -> str:
     return slugify(base)
 
 
+def _visible_dataset_filters() -> list:
+    origin_filter = visible_origin_filter(Dataset.data_origin, settings)
+    return [origin_filter] if origin_filter is not None else []
+
+
+def _visible_price_filters(price_model) -> list:
+    origin_filter = visible_origin_filter(price_model.data_origin, settings)
+    return [origin_filter] if origin_filter is not None else []
+
+
 async def ensure_public_price_dataset(db: AsyncSession) -> Dataset:
     from fasodata.prices.models import PriceData
 
     now = datetime.now(timezone.utc)
-    row_count = await db.scalar(select(func.count()).select_from(PriceData))
+    row_count = await db.scalar(
+        select(func.count()).select_from(PriceData).where(*_visible_price_filters(PriceData))
+    )
     result = await db.execute(select(Dataset).where(Dataset.slug == PRICE_DATASET_SLUG))
     dataset = result.scalar_one_or_none()
 
@@ -68,6 +82,7 @@ async def ensure_public_price_dataset(db: AsyncSession) -> Dataset:
             slug=PRICE_DATASET_SLUG,
             name="Prix alimentaires - Burkina Faso",
             published_at=now,
+            data_origin="public",
         )
         db.add(dataset)
 
@@ -78,6 +93,7 @@ async def ensure_public_price_dataset(db: AsyncSession) -> Dataset:
     dataset.category = "Agriculture"
     dataset.tags = ["prix", "cereales", "WFP", "Burkina Faso", "marches"]
     dataset.source = "WFP DataBridges; FasoData SMS"
+    dataset.data_origin = "public"
     dataset.license = DatasetLicense.open
     dataset.status = DatasetStatus.published
     dataset.is_geo = False
@@ -102,6 +118,7 @@ def _price_row_to_dict(row) -> dict:
         "quality": row.quality,
         "price_date": row.price_date.isoformat(),
         "source": row.source,
+        "data_origin": row.data_origin,
         "reporter": row.reporter,
         "validation_status": row.validation_status,
         "notes": row.notes,
@@ -118,7 +135,7 @@ async def list_datasets(
     db: AsyncSession = Depends(get_db),
 ):
     await ensure_public_price_dataset(db)
-    query = select(Dataset)
+    query = select(Dataset).where(*_visible_dataset_filters())
     if status:
         query = query.where(Dataset.status == status)
     if category:
@@ -148,8 +165,10 @@ async def create_dataset(
     if existing.scalar_one_or_none():
         slug = f"{slug}-{uuid.uuid4().hex[:6]}"
 
+    payload = data.model_dump()
+    payload["data_origin"] = payload.get("data_origin") or "user_upload"
     dataset = Dataset(
-        **data.model_dump(),
+        **payload,
         slug=slug,
         owner_id=current_user.id,
     )
@@ -217,7 +236,9 @@ async def get_dataset(slug: str, db: AsyncSession = Depends(get_db)):
     if slug == PRICE_DATASET_SLUG:
         await ensure_public_price_dataset(db)
 
-    result = await db.execute(select(Dataset).where(Dataset.slug == slug))
+    result = await db.execute(
+        select(Dataset).where(Dataset.slug == slug, *_visible_dataset_filters())
+    )
     dataset = result.scalar_one_or_none()
     if not dataset:
         raise HTTPException(404, detail="Dataset introuvable")
@@ -234,7 +255,9 @@ async def update_dataset(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_institutional),
 ):
-    result = await db.execute(select(Dataset).where(Dataset.slug == slug))
+    result = await db.execute(
+        select(Dataset).where(Dataset.slug == slug, *_visible_dataset_filters())
+    )
     dataset = result.scalar_one_or_none()
     if not dataset:
         raise HTTPException(404, detail="Dataset introuvable")
@@ -255,7 +278,9 @@ async def submit_dataset_for_review(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_institutional),
 ):
-    result = await db.execute(select(Dataset).where(Dataset.slug == slug))
+    result = await db.execute(
+        select(Dataset).where(Dataset.slug == slug, *_visible_dataset_filters())
+    )
     dataset = result.scalar_one_or_none()
     if not dataset:
         raise HTTPException(404, detail="Dataset introuvable")
@@ -277,7 +302,9 @@ async def approve_dataset(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_admin),
 ):
-    result = await db.execute(select(Dataset).where(Dataset.slug == slug))
+    result = await db.execute(
+        select(Dataset).where(Dataset.slug == slug, *_visible_dataset_filters())
+    )
     dataset = result.scalar_one_or_none()
     if not dataset:
         raise HTTPException(404, detail="Dataset introuvable")
@@ -321,6 +348,7 @@ async def preview_dataset(
         dataset = await ensure_public_price_dataset(db)
         result = await db.execute(
             select(PriceData)
+            .where(*_visible_price_filters(PriceData))
             .order_by(PriceData.price_date.desc(), PriceData.created_at.desc())
             .limit(limit)
         )
@@ -331,7 +359,9 @@ async def preview_dataset(
             total_rows=dataset.row_count,
         )
 
-    result = await db.execute(select(Dataset).where(Dataset.slug == slug))
+    result = await db.execute(
+        select(Dataset).where(Dataset.slug == slug, *_visible_dataset_filters())
+    )
     dataset = result.scalar_one_or_none()
     if not dataset:
         raise HTTPException(404, detail="Dataset introuvable")
@@ -388,7 +418,9 @@ async def stats_dataset(slug: str, db: AsyncSession = Depends(get_db)):
             columns=PRICE_DATASET_COLUMNS,
         )
 
-    result = await db.execute(select(Dataset).where(Dataset.slug == slug))
+    result = await db.execute(
+        select(Dataset).where(Dataset.slug == slug, *_visible_dataset_filters())
+    )
     dataset = result.scalar_one_or_none()
     if not dataset:
         raise HTTPException(404, detail="Dataset introuvable")
@@ -410,7 +442,9 @@ async def download_dataset(slug: str, db: AsyncSession = Depends(get_db)):
         dataset.download_count += 1
 
         result = await db.execute(
-            select(PriceData).order_by(PriceData.price_date.desc(), PriceData.created_at.desc())
+            select(PriceData)
+            .where(*_visible_price_filters(PriceData))
+            .order_by(PriceData.price_date.desc(), PriceData.created_at.desc())
         )
         buffer = io.StringIO()
         writer = csv.DictWriter(buffer, fieldnames=[col["name"] for col in PRICE_DATASET_COLUMNS])
@@ -425,7 +459,9 @@ async def download_dataset(slug: str, db: AsyncSession = Depends(get_db)):
             headers={"Content-Disposition": f"attachment; filename={PRICE_DATASET_SLUG}.csv"},
         )
 
-    result = await db.execute(select(Dataset).where(Dataset.slug == slug))
+    result = await db.execute(
+        select(Dataset).where(Dataset.slug == slug, *_visible_dataset_filters())
+    )
     dataset = result.scalar_one_or_none()
     if not dataset:
         raise HTTPException(404, detail="Dataset introuvable")

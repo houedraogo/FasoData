@@ -29,7 +29,6 @@ from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from fasodata.core.config import get_settings
-from fasodata.core.database import Base
 from fasodata.prices.models import PriceData
 
 settings = get_settings()
@@ -316,9 +315,6 @@ async def seed():
     engine  = create_async_engine(settings.database_url, echo=False)
     factory = async_sessionmaker(engine, expire_on_commit=False)
 
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
     async with factory() as session:
         # ── Nettoyage idempotent ───────────────────────────────────────────
         await session.execute(
@@ -340,6 +336,7 @@ async def seed():
                     price=float(price),
                     price_date=date(y, m, 15),
                     source="wfp",
+                    data_origin="seed",
                     quality=meta["quality"],
                     notes=f"WFP VAM / SONAGESS — {meta['label']} — moyenne mensuelle nationale",
                 ))
@@ -353,6 +350,7 @@ async def seed():
                         price=round(base_price * factor, 1),
                         price_date=date(y, m, 15),
                         source="wfp",
+                        data_origin="seed",
                         quality=meta["quality"],
                         notes=f"WFP VAM — {meta['label']} — estimation régionale {region}",
                     ))

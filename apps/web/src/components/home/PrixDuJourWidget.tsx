@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import {
   TrendingUp, TrendingDown, Minus, AlertTriangle,
-  ArrowRight, RefreshCw, MapPin, Bell, X,
+  ArrowRight, RefreshCw, MapPin, Bell, X, Database,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -24,11 +24,16 @@ interface LatestPrice {
   unit:       string;
 }
 
+interface PriceSeries {
+  commodity: string;
+  points: Array<{ period: string; price: number }>;
+}
+
 // ── Config produits ────────────────────────────────────────────────────────────
 
 const COMMODITIES = [
   { key: "sorghum",    label: "Sorgho",    emoji: "🌾", seuil: 320, color: "#E04E2F" },
-  { key: "rice_local", label: "Riz local", emoji: "🍚", seuil: 500, color: "#1A2C42" },
+  { key: "rice_imported", label: "Riz importé", emoji: "🍚", seuil: 500, color: "#1A2C42" },
   { key: "maize",      label: "Maïs",      emoji: "🌽", seuil: 300, color: "#16A34A" },
   { key: "millet",     label: "Mil",       emoji: "🌿", seuil: 350, color: "#D97706" },
   { key: "cowpea",     label: "Niébé",     emoji: "🫘", seuil: 650, color: "#8B5CF6" },
@@ -59,20 +64,11 @@ function InlineSparkline({ data, color, up }: { data: number[]; color: string; u
 
 export default function PrixDuJourWidget() {
   const [prices, setPrices]       = useState<LatestPrice[]>([]);
+  const [sparklines, setSparklines] = useState<Record<string, number[]>>({});
   const [loading, setLoading]     = useState(true);
   const [lastUpdate, setLastUpdate] = useState<string>("");
   const [error, setError]         = useState(false);
   const [showAlert, setShowAlert] = useState(false);
-
-  // Données historiques simulées pour les sparklines (derniers 8 mois)
-  // En production ces données viendraient de l'API /prices/series
-  const SPARKLINES: Record<string, number[]> = {
-    sorghum:    [265, 278, 295, 310, 322, 335, 352, 342],
-    rice_local: [505, 515, 526, 540, 554, 570, 595, 582],
-    maize:      [220, 235, 248, 265, 278, 295, 312, 302],
-    millet:     [250, 265, 280, 295, 312, 328, 345, 335],
-    cowpea:     [490, 505, 520, 535, 550, 568, 585, 572],
-  };
 
   const fetchPrices = async () => {
     setLoading(true);
@@ -84,19 +80,30 @@ export default function PrixDuJourWidget() {
       });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data: LatestPrice[] = await resp.json();
+      const seriesEntries = await Promise.all(
+        COMMODITIES.map(async (commodity) => {
+          const params = new URLSearchParams({
+            commodity: commodity.key,
+            region: "National",
+            granularity: "monthly",
+            start: "2022-01",
+          });
+          const seriesResp = await fetch(`${window.location.origin}/api/prices/series?${params}`, {
+            cache: "no-store",
+          });
+          if (!seriesResp.ok) return [commodity.key, []] as const;
+          const series = (await seriesResp.json()) as PriceSeries;
+          return [commodity.key, series.points.slice(-8).map((point) => point.price)] as const;
+        })
+      );
       setPrices(data);
+      setSparklines(Object.fromEntries(seriesEntries));
       setLastUpdate(new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }));
     } catch {
       setError(true);
-      // Fallback : données statiques
-      setPrices([
-        { commodity: "sorghum",    region: "National", price: 312, price_date: "2025-03-15", unit: "CFA/kg" },
-        { commodity: "rice_local", region: "National", price: 558, price_date: "2025-03-15", unit: "CFA/kg" },
-        { commodity: "maize",      region: "National", price: 302, price_date: "2025-03-15", unit: "CFA/kg" },
-        { commodity: "millet",     region: "National", price: 350, price_date: "2025-03-15", unit: "CFA/kg" },
-        { commodity: "cowpea",     region: "National", price: 680, price_date: "2025-03-15", unit: "CFA/kg" },
-      ]);
-      setLastUpdate("données de référence");
+      setPrices([]);
+      setSparklines({});
+      setLastUpdate("indisponible");
     } finally {
       setLoading(false);
     }
@@ -106,7 +113,7 @@ export default function PrixDuJourWidget() {
 
   // Calculer la tendance (comparaison avec le sparkline avant-dernier point)
   const getTrend = (commodity: string, currentPrice: number) => {
-    const hist = SPARKLINES[commodity];
+    const hist = sparklines[commodity];
     if (!hist || hist.length < 2) return { pct: 0, up: false, flat: true };
     const prev = hist[hist.length - 2];
     const pct  = ((currentPrice - prev) / prev) * 100;
@@ -131,9 +138,9 @@ export default function PrixDuJourWidget() {
             </h2>
             <p className="text-sm text-gray-500 mt-0.5 flex items-center gap-2">
               <MapPin className="w-3.5 h-3.5" />
-              Moyenne nationale · Source WFP / SONAGESS
+              Moyenne nationale · Source publique HDX/WFP
               {lastUpdate && <span className="text-gray-400">· Mis à jour {lastUpdate}</span>}
-              {error && <span className="text-amber-500 text-xs">· données de référence</span>}
+              {error && <span className="text-amber-500 text-xs">· prix indisponibles</span>}
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -177,13 +184,25 @@ export default function PrixDuJourWidget() {
         )}
 
         {/* Grille des prix */}
+        {!loading && !error && prices.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-5 py-8 text-center">
+            <Database className="mx-auto mb-3 h-8 w-8 text-gray-300" />
+            <p className="text-sm font-semibold text-gray-700">Aucun prix vérifié disponible</p>
+            <p className="mx-auto mt-1 max-w-xl text-xs text-gray-400">
+              Les prix publics apparaîtront ici dès qu’une source HDX/WFP ou une collecte terrain validée sera disponible.
+            </p>
+            <Link href="/datasets" className="mt-4 inline-flex text-xs font-semibold text-[#E04E2F] hover:underline">
+              Explorer le catalogue
+            </Link>
+          </div>
+        ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {COMMODITIES.map((c) => {
             const p       = prices.find((px) => px.commodity === c.key);
             const price   = p?.price ?? 0;
             const { pct, up, flat } = getTrend(c.key, price);
             const aboveSeuil = price > c.seuil;
-            const hist       = SPARKLINES[c.key] ?? [];
+            const hist       = sparklines[c.key] ?? [];
 
             return (
               <Link key={c.key} href="/carte-prix"
@@ -248,11 +267,12 @@ export default function PrixDuJourWidget() {
             );
           })}
         </div>
+        )}
 
         {/* Footer widget */}
         <div className="flex items-center justify-between mt-5 pt-4 border-t border-gray-100 flex-wrap gap-3">
           <p className="text-xs text-gray-400">
-            Données WFP VAM Food Prices · SONAGESS Burkina Faso · Moyennes mensuelles nationales
+            Source publique HDX/WFP Food Prices · observations Burkina Faso
           </p>
           <div className="flex items-center gap-4">
             <Link href="/carte-prix"

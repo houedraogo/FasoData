@@ -44,6 +44,7 @@ class Dataset(Base):
     category: Mapped[str | None] = mapped_column(String(100), index=True)
     tags: Mapped[list] = mapped_column(JSONB, default=list)
     source: Mapped[str | None] = mapped_column(String(255))
+    data_origin: Mapped[str] = mapped_column(String(30), default="user_upload", server_default="user_upload", nullable=False, index=True)
     license: Mapped[DatasetLicense] = mapped_column(
         Enum(DatasetLicense), default=DatasetLicense.open
     )

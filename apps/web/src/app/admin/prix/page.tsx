@@ -19,7 +19,7 @@ interface SmsRecord { id: string; commodity: string; region: string; price: numb
 interface ValidationQueue { items: SmsRecord[]; total: number; counts: Record<string, number>; }
 
 const COMMODITY_LABELS: Record<string, string> = {
-  sorghum: "Sorgho", rice_local: "Riz local", maize: "Maïs",
+  sorghum: "Sorgho", rice_local: "Riz local", rice_imported: "Riz importé", maize: "Maïs",
   millet: "Mil", cowpea: "Niébé", groundnut: "Arachide",
 };
 
@@ -113,7 +113,7 @@ export default function AdminPrixPage() {
       qc.invalidateQueries({ queryKey: ["validation-queue"] });
       if (data.status === "accepted") toast.success(`✅ ${data.commodity} · ${data.region} · ${data.price} CFA/kg`);
       else toast.error("❌ Format non reconnu");
-    } catch { toast.error("Erreur simulation"); }
+    } catch { toast.error("Erreur test webhook"); }
   };
 
   const triggerAggregation = async () => {
@@ -129,7 +129,7 @@ export default function AdminPrixPage() {
   const sendTestSms = async () => {
     try {
       const { data } = await api.post("/prices/sms/send", { to: testPhone, message: testMsg });
-      toast.success(data.status === "simulated" ? `[SIM] → ${testPhone}` : `✅ Envoyé → ${testPhone}`);
+      toast.success(data.status === "simulated" ? `[Sandbox] → ${testPhone}` : `✅ Envoyé → ${testPhone}`);
     } catch { toast.error("Erreur envoi SMS"); }
   };
 
@@ -144,15 +144,15 @@ export default function AdminPrixPage() {
   const TABS: { key: Tab; icon: React.ElementType; label: string; badge?: number }[] = [
     { key: "validation",  icon: Shield,       label: "Validation SMS",   badge: pendingCount },
     { key: "aggregation", icon: BarChart3,     label: "Agrégation nocturne" },
-    { key: "sms_test",    icon: MessageSquare, label: "Tests & Simulateur" },
+    { key: "sms_test",    icon: MessageSquare, label: "Tests sandbox" },
   ];
 
   return (
-    <div className="p-6 lg:p-8 space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-6 overflow-x-hidden">
 
       {/* En-tête */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
+        <div className="min-w-0">
           <h1 className="text-2xl font-bold text-gray-900">SMS Prix — Africa's Talking</h1>
           <p className="text-gray-500 text-sm mt-1">
             Validation des relevés terrain · Agrégation nocturne · Monitoring
@@ -160,28 +160,30 @@ export default function AdminPrixPage() {
         </div>
 
         {/* Statut AT */}
-        <div className={cn("flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-medium",
+        <div className={cn("flex w-full items-center gap-2 px-4 py-2 rounded-xl border text-sm font-medium sm:w-auto",
           atStatus?.at_configured ? "bg-green-50 border-green-200 text-green-700" : "bg-amber-50 border-amber-200 text-amber-700")}>
           <span className={cn("w-2 h-2 rounded-full", atStatus?.at_configured ? "bg-green-500 animate-pulse" : "bg-amber-500")} />
-          {atStatus?.at_configured ? "AT Opérationnel" : "Mode Simulation"}
+          {atStatus?.at_configured ? "AT Opérationnel" : "Mode local"}
         </div>
       </div>
 
       {/* Onglets */}
-      <div className="flex gap-1.5 border-b border-gray-100 pb-0">
-        {TABS.map(({ key, icon: Icon, label, badge }) => (
-          <button key={key} onClick={() => setTab(key)}
-            className={cn("flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-t-lg border-b-2 transition-colors",
-              tab === key ? "border-[#1A2C42] text-[#1A2C42] bg-[#1A2C42]/5" : "border-transparent text-gray-500 hover:text-gray-700")}>
-            <Icon className="w-4 h-4" />
-            {label}
-            {badge != null && badge > 0 && (
-              <span className="bg-[#E04E2F] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
-                {badge}
-              </span>
-            )}
-          </button>
-        ))}
+      <div className="border-b border-gray-100 overflow-x-auto">
+        <div className="flex min-w-max gap-1.5 pb-0">
+          {TABS.map(({ key, icon: Icon, label, badge }) => (
+            <button key={key} onClick={() => setTab(key)}
+              className={cn("flex items-center gap-2 px-3 sm:px-4 py-2.5 text-sm font-medium rounded-t-lg border-b-2 transition-colors whitespace-nowrap",
+                tab === key ? "border-[#1A2C42] text-[#1A2C42] bg-[#1A2C42]/5" : "border-transparent text-gray-500 hover:text-gray-700")}>
+              <Icon className="w-4 h-4 shrink-0" />
+              {label}
+              {badge != null && badge > 0 && (
+                <span className="bg-[#E04E2F] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                  {badge}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* ══════════════════════════════════════════════════════════════════════
@@ -238,7 +240,7 @@ export default function AdminPrixPage() {
               <span className="text-xs text-gray-400 ml-auto">
                 {queue?.total ?? 0} relevé(s) · filtre: <strong>{STATUS_CFG[filterStatus]?.label}</strong>
               </span>
-              <button onClick={() => refetch()} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+              <button onClick={() => refetch()} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors" aria-label="Actualiser les relevés SMS">
                 <RefreshCw className="w-4 h-4" />
               </button>
             </div>
@@ -264,7 +266,7 @@ export default function AdminPrixPage() {
                   Aucun relevé — statut : {STATUS_CFG[filterStatus]?.label}
                 </p>
                 <p className="text-xs text-gray-300 mt-1">
-                  Utilisez l'onglet "Tests & Simulateur" pour créer des données
+                  Utilisez l'onglet "Tests sandbox" pour créer des relevés de test
                 </p>
               </div>
             ) : (
@@ -427,7 +429,7 @@ export default function AdminPrixPage() {
                   {aggHistory?.total ?? 0} total
                 </span>
               </div>
-              <button onClick={() => refetchAgg()} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+              <button onClick={() => refetchAgg()} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors" aria-label="Actualiser les agrégations">
                 <RefreshCw className="w-4 h-4" />
               </button>
             </div>
@@ -472,10 +474,10 @@ export default function AdminPrixPage() {
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
             <h2 className="font-bold text-gray-900 mb-1 flex items-center gap-2">
               <MessageSquare className="w-4 h-4 text-[#E04E2F]" />
-              Simuler un SMS entrant (webhook)
+              Simulateur sandbox de SMS entrant
             </h2>
             <p className="text-xs text-gray-400 mb-5">
-              Simule un POST Africa's Talking vers le webhook — sans SIM requise
+              Outil admin de test : simule un POST Africa's Talking vers le webhook, sans SIM requise.
             </p>
 
             {/* Exemples rapides */}
@@ -502,7 +504,7 @@ export default function AdminPrixPage() {
               <button onClick={simulateWebhook}
                 className="w-full flex items-center justify-center gap-2 py-2.5 bg-[#E04E2F] hover:bg-[#c73e22] text-white font-semibold rounded-xl text-sm">
                 <MessageSquare className="w-4 h-4" />
-                Simuler la réception du SMS
+                Injecter un SMS de test
               </button>
             </div>
 
@@ -560,7 +562,7 @@ export default function AdminPrixPage() {
               <div className="space-y-3 text-sm">
                 {[
                   { label: "Utilisateur", value: atStatus?.at_username ?? "—" },
-                  { label: "Clé API",     value: atStatus?.api_key_set ? "✅ Définie" : "❌ Manquante (simulation)" },
+                  { label: "Clé API",     value: atStatus?.api_key_set ? "✅ Définie" : "❌ Manquante (mode local)" },
                   { label: "Mode",        value: atStatus?.at_sandbox ? "Sandbox (gratuit)" : "Production" },
                 ].map(({ label, value }) => (
                   <div key={label} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
@@ -574,7 +576,7 @@ export default function AdminPrixPage() {
                   <code className="text-xs text-gray-600 flex-1 truncate">
                     https://fasodata.bf{atStatus?.webhook_url}
                   </code>
-                  <button onClick={copyUrl} className="p-1 text-gray-400 hover:text-[#1A2C42] shrink-0">
+                  <button onClick={copyUrl} className="p-1 text-gray-400 hover:text-[#1A2C42] shrink-0" aria-label="Copier l'URL webhook">
                     <Copy className="w-3.5 h-3.5" />
                   </button>
                 </div>

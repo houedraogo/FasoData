@@ -14,6 +14,7 @@ class PriceDataCreate(BaseModel):
     quality:    str | None = None
     price_date: date
     source:     str = "manual"
+    data_origin: str = "manual"
     reporter:   str | None = None
     notes:      str | None = None
 

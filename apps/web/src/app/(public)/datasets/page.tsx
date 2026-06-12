@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { Search, Filter, Download, Eye, Calendar, Database, Tag } from "lucide-react";
+import { Search, Download, Eye, Database, Tag, AlertTriangle, RefreshCw, XCircle } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatBytes, formatDate, formatNumber } from "@/lib/utils";
+import { DataOriginBadge } from "@/components/ui/DataOriginBadge";
 
 const categories = ["Agriculture", "Santé", "Éducation", "Économie", "Géographie", "Environnement", "Sécurité", "Social"];
 
@@ -18,6 +19,7 @@ type Dataset = {
   tags: string[];
   license: string;
   status: string;
+  data_origin?: string | null;
   file_format: string | null;
   file_size_bytes: number | null;
   row_count: number | null;
@@ -31,7 +33,7 @@ export default function DatasetsPage() {
   const [category, setCategory] = useState("");
   const [page, setPage] = useState(1);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, isFetching, refetch } = useQuery({
     queryKey: ["datasets", search, category, page],
     queryFn: async () => {
       const params = new URLSearchParams({
@@ -53,7 +55,7 @@ export default function DatasetsPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h1 className="text-3xl font-bold text-white mb-2">Explorer les données</h1>
           <p className="text-white/70">
-            {data?.total ? formatNumber(data.total) : "—"} jeux de données disponibles
+            {isError ? "Catalogue momentanément indisponible" : data?.total ? formatNumber(data.total) : "—"} jeux de données disponibles
           </p>
 
           {/* Barre de recherche */}
@@ -93,11 +95,35 @@ export default function DatasetsPage() {
               </div>
             ))}
           </div>
+        ) : isError ? (
+          <div className="card p-10 text-center">
+            <AlertTriangle className="w-12 h-12 text-amber-300 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-gray-700">Impossible de charger le catalogue</h3>
+            <p className="text-gray-400 mt-2 text-sm">Le service des datasets ne répond pas pour le moment.</p>
+            <button
+              onClick={() => refetch()}
+              className="mt-5 inline-flex items-center gap-2 rounded-xl bg-faso-navy px-4 py-2 text-sm font-semibold text-white hover:bg-faso-navy/90"
+            >
+              <RefreshCw className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`} />
+              Réessayer
+            </button>
+          </div>
         ) : data?.items?.length === 0 ? (
           <div className="text-center py-20">
             <Database className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-500">Aucun dataset trouvé</h3>
-            <p className="text-gray-400 mt-2">Essayez d'autres termes de recherche</p>
+            <h3 className="text-lg font-semibold text-gray-500">Aucun dataset vérifié trouvé</h3>
+            <p className="text-gray-400 mt-2">
+              {search || category ? "Essayez d'autres filtres de recherche." : "Le catalogue public ne contient pas encore de dataset vérifié publié."}
+            </p>
+            {(search || category) && (
+              <button
+                onClick={() => { setSearch(""); setCategory(""); setPage(1); }}
+                className="mt-5 inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
+              >
+                <XCircle className="w-4 h-4" />
+                Réinitialiser les filtres
+              </button>
+            )}
           </div>
         ) : (
           <>
@@ -159,9 +185,12 @@ function DatasetCard({ dataset }: { dataset: Dataset }) {
             </span>
           )}
         </div>
-        <span className={`badge shrink-0 ${licenseColors[dataset.license] || "bg-gray-100 text-gray-600"}`}>
-          {dataset.license}
-        </span>
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <DataOriginBadge origin={dataset.data_origin} compact />
+          <span className={`badge ${licenseColors[dataset.license] || "bg-gray-100 text-gray-600"}`}>
+            {dataset.license}
+          </span>
+        </div>
       </div>
 
       {dataset.description && (

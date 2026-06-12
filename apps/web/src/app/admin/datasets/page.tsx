@@ -11,6 +11,8 @@ import {
 import { api } from "@/lib/api";
 import { formatDate, formatNumber, formatBytes } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+import { FocusTrap } from "@/components/ui/FocusTrap";
+import { DataOriginBadge } from "@/components/ui/DataOriginBadge";
 import toast from "react-hot-toast";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -24,6 +26,7 @@ interface Dataset {
   description: string | null;
   category: string | null;
   status: DatasetStatus;
+  data_origin?: string | null;
   license: string;
   is_geo: boolean;
   file_format: string | null;
@@ -89,10 +92,15 @@ function ConfirmModal({
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full mx-4">
-        <h3 className="font-bold text-gray-900 text-lg mb-2">{title}</h3>
-        <p className="text-gray-500 text-sm mb-6">{message}</p>
+      <button type="button" className="absolute inset-0 bg-black/40" onClick={onClose} aria-label="Fermer la modale" />
+      <FocusTrap
+        onEscape={onClose}
+        labelledBy="confirm-modal-title"
+        describedBy="confirm-modal-description"
+        className="relative bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full mx-4"
+      >
+        <h3 id="confirm-modal-title" className="font-bold text-gray-900 text-lg mb-2">{title}</h3>
+        <p id="confirm-modal-description" className="text-gray-500 text-sm mb-6">{message}</p>
         <div className="flex gap-3 justify-end">
           <button onClick={onClose} className="btn-secondary text-sm px-4 py-2">
             Annuler
@@ -101,7 +109,7 @@ function ConfirmModal({
             {confirmLabel}
           </button>
         </div>
-      </div>
+      </FocusTrap>
     </div>
   );
 }
@@ -123,7 +131,7 @@ export default function AdminDatasetsPage() {
   }>({ open: false, type: null, dataset: null });
 
   // ── Query ─────────────────────────────────────────────────────────────────
-  const { data, isLoading, refetch } = useQuery<DatasetList>({
+  const { data, isLoading, isFetching, isError, refetch } = useQuery<DatasetList>({
     queryKey: ["admin-datasets", activeTab, search, page],
     queryFn: async () => {
       const params = new URLSearchParams({
@@ -207,7 +215,7 @@ export default function AdminDatasetsPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Modération des datasets</h1>
           <p className="text-gray-500 text-sm mt-1">
-            {data ? `${data.total} dataset(s) au total` : "Chargement…"}
+            {isError ? "Impossible de charger la modération" : data ? `${data.total} dataset(s) au total` : "Chargement…"}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -215,8 +223,9 @@ export default function AdminDatasetsPage() {
             onClick={() => refetch()}
             className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-colors"
             title="Actualiser"
+            aria-label="Actualiser la liste des datasets"
           >
-            <RefreshCw className="w-4 h-4" />
+            <RefreshCw className={cn("w-4 h-4", isFetching && "animate-spin")} />
           </button>
           <Link href="/dashboard/import" className="btn-secondary text-sm">
             <Database className="w-4 h-4" />
@@ -299,12 +308,35 @@ export default function AdminDatasetsPage() {
                     ))}
                   </tr>
                 ))
+              ) : isError ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-16 text-center text-gray-400">
+                    <XCircle className="w-10 h-10 mx-auto mb-3 text-red-200" />
+                    <p className="font-medium text-gray-600">Impossible de charger les datasets</p>
+                    <p className="text-xs mt-1">Vérifiez l'API ou réessayez dans quelques instants.</p>
+                    <button
+                      onClick={() => refetch()}
+                      className="mt-4 inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      Réessayer
+                    </button>
+                  </td>
+                </tr>
               ) : data?.items?.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-16 text-center text-gray-400">
                     <Database className="w-10 h-10 mx-auto mb-3 opacity-30" />
                     <p className="font-medium text-gray-500">Aucun dataset trouvé</p>
-                    {search && <p className="text-xs mt-1">Essayez un autre terme de recherche.</p>}
+                    <p className="text-xs mt-1">
+                      {search ? "Essayez un autre terme de recherche." : "Importez un dataset ou changez de statut."}
+                    </p>
+                    {!search && (
+                      <Link href="/dashboard/import" className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#1A2C42] px-4 py-2 text-xs font-semibold text-white hover:bg-[#223a57]">
+                        <Database className="w-3.5 h-3.5" />
+                        Importer un dataset
+                      </Link>
+                    )}
                   </td>
                 </tr>
               ) : (
@@ -353,6 +385,9 @@ export default function AdminDatasetsPage() {
                     {/* Statut */}
                     <td className="px-6 py-4">
                       <StatusBadge status={ds.status} />
+                      <div className="mt-1.5">
+                        <DataOriginBadge origin={ds.data_origin} compact showSynthetic />
+                      </div>
                     </td>
 
                     {/* Stats fichier */}
@@ -393,6 +428,7 @@ export default function AdminDatasetsPage() {
                             target="_blank"
                             className="p-1.5 text-gray-400 hover:text-faso-navy hover:bg-gray-100 rounded-lg transition-colors"
                             title="Voir la page publique"
+                            aria-label={`Voir la page publique du dataset ${ds.name}`}
                           >
                             <ExternalLink className="w-3.5 h-3.5" />
                           </Link>
@@ -451,6 +487,7 @@ export default function AdminDatasetsPage() {
                           onClick={() => openModal("delete", ds)}
                           className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                           title="Supprimer définitivement"
+                          aria-label={`Supprimer le dataset ${ds.name}`}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>

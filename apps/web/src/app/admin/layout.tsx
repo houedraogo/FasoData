@@ -6,6 +6,7 @@ import {
   Users, Globe, Database, TrendingUp, Shield,
   FileText, Settings, LogOut, ChevronRight, Mail,
 } from "lucide-react";
+import { AuthGate } from "@/components/auth/AuthGate";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 
@@ -35,6 +36,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     .split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
 
   return (
+    <AuthGate allowedRoles={["admin"]}>
     <div className="min-h-screen flex bg-[#F8F9FB]">
 
       {/* ── Sidebar ── */}
@@ -113,7 +115,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
 
           {/* Alerte badge */}
-          <button className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-[#E04E2F] text-xs font-semibold rounded-lg border border-red-100">
+          <button
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-[#E04E2F] text-xs font-semibold rounded-lg border border-red-100"
+            aria-label="Afficher les alertes administrateur"
+          >
             <span className="w-1.5 h-1.5 bg-[#E04E2F] rounded-full" />
             2 alertes
           </button>
@@ -154,5 +159,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <main className="flex-1">{children}</main>
       </div>
     </div>
+    </AuthGate>
   );
 }

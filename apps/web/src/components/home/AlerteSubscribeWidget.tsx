@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 const COMMODITIES = [
   { key: "sorghum",    label: "Sorgho",    seuil: 320 },
   { key: "rice_local", label: "Riz local", seuil: 500 },
+  { key: "rice_imported", label: "Riz importé", seuil: 500 },
   { key: "maize",      label: "Maïs",      seuil: 300 },
   { key: "millet",     label: "Mil",       seuil: 350 },
   { key: "cowpea",     label: "Niébé",     seuil: 650 },

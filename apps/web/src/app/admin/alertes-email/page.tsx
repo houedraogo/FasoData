@@ -53,6 +53,7 @@ type SubscriptionList = {
 const COMMODITIES: Record<string, string> = {
   sorghum: "Sorgho",
   rice_local: "Riz local",
+  rice_imported: "Riz importé",
   maize: "Mais",
   millet: "Mil",
   cowpea: "Niebe",
@@ -216,7 +217,7 @@ export default function AdminEmailAlertsPage() {
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
-        <div className="grid min-w-[1080px] grid-cols-[1.35fr_.95fr_.75fr_.75fr_.75fr_.65fr_.75fr_1fr] gap-4 border-b border-gray-100 bg-gray-50 px-5 py-3 text-xs font-bold uppercase tracking-wide text-gray-500">
+        <div className="hidden sm:grid sm:min-w-[1080px] grid-cols-[1.35fr_.95fr_.75fr_.75fr_.75fr_.65fr_.75fr_1fr] gap-4 border-b border-gray-100 bg-gray-50 px-5 py-3 text-xs font-bold uppercase tracking-wide text-gray-500">
           <span>Abonne</span>
           <span>WhatsApp</span>
           <span>Produit</span>
@@ -228,12 +229,12 @@ export default function AdminEmailAlertsPage() {
         </div>
         <div className="overflow-x-auto">
           {isLoading ? (
-            <div className="min-w-[1080px] px-5 py-8 text-sm text-gray-500">Chargement des abonnements...</div>
+            <div className="sm:min-w-[1080px] px-5 py-8 text-sm text-gray-500">Chargement des abonnements...</div>
           ) : rows.length === 0 ? (
-            <div className="min-w-[1080px] px-5 py-8 text-sm text-gray-500">Aucun abonnement trouve.</div>
+            <div className="sm:min-w-[1080px] px-5 py-8 text-sm text-gray-500">Aucun abonnement trouve.</div>
           ) : (
             rows.map((sub) => (
-              <div key={sub.id} className="grid min-w-[1080px] grid-cols-[1.35fr_.95fr_.75fr_.75fr_.75fr_.65fr_.75fr_1fr] items-center gap-4 border-b border-gray-50 px-5 py-4 text-sm last:border-0">
+              <div key={sub.id} className="grid grid-cols-1 sm:min-w-[1080px] sm:grid-cols-[1.35fr_.95fr_.75fr_.75fr_.75fr_.65fr_.75fr_1fr] items-start sm:items-center gap-3 sm:gap-4 border-b border-gray-50 px-4 sm:px-5 py-4 text-sm last:border-0">
                 <div>
                   <p className="font-semibold text-gray-900">{sub.email}</p>
                   <p className="text-xs text-gray-400">Cree le {formatDate(sub.created_at)}</p>

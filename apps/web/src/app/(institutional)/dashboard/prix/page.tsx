@@ -24,7 +24,7 @@ interface PriceSeries { commodity: string; region: string; granularity: string; 
 
 const ALL_COMMODITIES = [
   { key: "sorghum",    label: "Sorgho",    color: "#E04E2F", seuil: 320 },
-  { key: "rice_local", label: "Riz local", color: "#1A2C42", seuil: 500 },
+  { key: "rice_imported", label: "Riz importé", color: "#1A2C42", seuil: 500 },
   { key: "maize",      label: "Maïs",      color: "#16A34A", seuil: 300 },
   { key: "millet",     label: "Mil",       color: "#D97706", seuil: 350 },
   { key: "cowpea",     label: "Niébé",     color: "#8B5CF6", seuil: 650 },
@@ -105,7 +105,7 @@ export default function PrixPage() {
 
   // Mode "produits" : 1 région, N produits
   const [region, setRegion]           = useState("National");
-  const [selectedKeys, setSelectedKeys] = useState(["sorghum", "rice_local"]);
+  const [selectedKeys, setSelectedKeys] = useState(["sorghum", "rice_imported"]);
   const activeCommodities = ALL_COMMODITIES.filter((c) => selectedKeys.includes(c.key));
 
   const toggleCommodity = (key: string) =>
@@ -398,7 +398,7 @@ export default function PrixPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Évolution des prix alimentaires</h1>
           <p className="text-gray-500 text-sm mt-1">
-            {mode === "countries" ? "Données WFP · Sahel central" : "Données WFP / SONAGESS · Burkina Faso"} · {titleLine}
+            {mode === "countries" ? "Données publiques WFP · Sahel central" : "Données HDX/WFP + terrain FasoData · Burkina Faso"} · {titleLine}
           </p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
@@ -637,7 +637,7 @@ export default function PrixPage() {
             </span>
           ))}
           <span className="text-gray-300 ml-auto">
-            Source : {mode === "countries" ? "WFP VAM Food Prices" : "WFP VAM / SONAGESS"}
+            Source : {mode === "countries" ? "HDX/WFP Food Prices" : "HDX/WFP + terrain FasoData"}
           </span>
         </div>
       </div>

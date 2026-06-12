@@ -172,7 +172,7 @@ export default function RapportsPage() {
       );
 
       // Vérifier que c'est bien un PDF et non une erreur JSON
-      const contentType = response.headers?.["content-type"] ?? "";
+      const contentType = String(response.headers?.["content-type"] ?? "");
       if (!contentType.includes("pdf")) {
         const msg = await blobErrorMessage(response.data as Blob);
         toast.error(msg);
@@ -209,7 +209,7 @@ export default function RapportsPage() {
         { responseType: "blob" }
       );
 
-      const contentType = response.headers?.["content-type"] ?? "";
+      const contentType = String(response.headers?.["content-type"] ?? "");
       if (!contentType.includes("pdf")) {
         const msg = await blobErrorMessage(response.data as Blob);
         toast.error(msg);

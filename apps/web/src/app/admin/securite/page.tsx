@@ -1,54 +1,49 @@
 "use client";
 
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import {
-  Shield, AlertTriangle, CheckCircle, Users, Lock,
-  Key, Eye, EyeOff, RefreshCw, Globe, Clock,
-} from "lucide-react";
+import { AlertTriangle, CheckCircle, Clock, Globe, Key, Lock, Shield, Users } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import toast from "react-hot-toast";
-
-// ── Composant carte sécurité ──────────────────────────────────────────────────
 
 function SecurityCard({
-  title, status, icon: Icon, children,
+  title,
+  status,
+  icon: Icon,
+  children,
 }: {
   title: string;
-  status: "ok" | "warning" | "error";
+  status: "ok" | "warning" | "pending";
   icon: React.ElementType;
   children: React.ReactNode;
 }) {
+  const styles = {
+    ok: "bg-green-100 text-green-600",
+    warning: "bg-yellow-100 text-yellow-700",
+    pending: "bg-gray-100 text-gray-500",
+  };
+
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2.5">
-          <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center",
-            status === "ok" ? "bg-green-100" : status === "warning" ? "bg-yellow-100" : "bg-red-100"
-          )}>
-            <Icon className={cn("w-4 h-4",
-              status === "ok" ? "text-green-600" : status === "warning" ? "text-yellow-700" : "text-red-600"
-            )} />
+          <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center", styles[status])}>
+            <Icon className="w-4 h-4" />
           </div>
           <h2 className="font-bold text-gray-900">{title}</h2>
         </div>
-        <div className={cn("w-2.5 h-2.5 rounded-full",
-          status === "ok" ? "bg-green-500" : status === "warning" ? "bg-yellow-500" : "bg-red-500"
-        )} />
+        <div
+          className={cn(
+            "w-2.5 h-2.5 rounded-full",
+            status === "ok" ? "bg-green-500" : status === "warning" ? "bg-yellow-500" : "bg-gray-300"
+          )}
+        />
       </div>
       {children}
     </div>
   );
 }
 
-// ── Page principale ───────────────────────────────────────────────────────────
-
 export default function SecuritePage() {
-  const [showKey, setShowKey]         = useState(false);
-  const [regenerating, setRegenerating] = useState(false);
-
-  // Comptage utilisateurs actifs/inactifs
   const { data: usersData } = useQuery({
     queryKey: ["security-users"],
     queryFn: async () => {
@@ -57,43 +52,32 @@ export default function SecuritePage() {
     },
   });
 
-  const totalUsers   = usersData?.total ?? 0;
-  const activeUsers  = usersData?.items?.filter((u: { is_active: boolean }) => u.is_active).length ?? 0;
+  const totalUsers = usersData?.total ?? 0;
+  const activeUsers = usersData?.items?.filter((u: { is_active: boolean }) => u.is_active).length ?? 0;
   const inactiveUsers = totalUsers - activeUsers;
-
-  // Score de sécurité simulé
-  const score = 82;
-  const scoreColor = score >= 80 ? "text-green-600" : score >= 60 ? "text-yellow-600" : "text-red-600";
-
-  const handleRegenerateKey = async () => {
-    setRegenerating(true);
-    await new Promise((r) => setTimeout(r, 1200));
-    setRegenerating(false);
-    toast.success("Clé API régénérée (simulation)");
-  };
+  const hasSecurityTelemetry = false;
 
   return (
     <div className="p-6 lg:p-8 space-y-6">
-
-      {/* En-tête */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Sécurité & Accès</h1>
-          <p className="text-gray-500 text-sm mt-1">Supervision de la sécurité de la plateforme</p>
+          <p className="text-gray-500 text-sm mt-1">
+            Vue de contrôle basée sur les données disponibles dans l'API.
+          </p>
         </div>
         <div className="text-center">
-          <div className={cn("text-4xl font-bold", scoreColor)}>{score}</div>
-          <div className="text-xs text-gray-400 mt-0.5">Score / 100</div>
+          <div className="text-2xl font-bold text-gray-500">N/A</div>
+          <div className="text-xs text-gray-400 mt-0.5">Score non instrumenté</div>
         </div>
       </div>
 
-      {/* Vue d'ensemble */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: "Utilisateurs actifs",   value: activeUsers,  icon: Users,  color: "bg-green-50 text-green-600" },
-          { label: "Comptes désactivés",     value: inactiveUsers,icon: Lock,   color: "bg-red-50 text-red-600" },
-          { label: "Tentatives échouées",    value: 3,            icon: AlertTriangle, color: "bg-yellow-50 text-yellow-600" },
-          { label: "Sessions actives (24h)", value: activeUsers,  icon: Globe,  color: "bg-blue-50 text-blue-600" },
+          { label: "Utilisateurs actifs", value: activeUsers, icon: Users, color: "bg-green-50 text-green-600" },
+          { label: "Comptes désactivés", value: inactiveUsers, icon: Lock, color: "bg-red-50 text-red-600" },
+          { label: "Tentatives échouées", value: hasSecurityTelemetry ? 0 : "N/A", icon: AlertTriangle, color: "bg-yellow-50 text-yellow-600" },
+          { label: "Sessions actives (24h)", value: hasSecurityTelemetry ? 0 : "N/A", icon: Globe, color: "bg-blue-50 text-blue-600" },
         ].map(({ label, value, icon: Icon, color }) => (
           <div key={label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
             <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center mb-3", color)}>
@@ -106,44 +90,32 @@ export default function SecuritePage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-        {/* Statut des services */}
-        <SecurityCard title="Statut des services" status="ok" icon={CheckCircle}>
+        <SecurityCard title="Statut des services" status="pending" icon={CheckCircle}>
           <div className="space-y-3">
-            {[
-              { name: "API FastAPI",     ok: true,  detail: "Répond en < 50ms" },
-              { name: "Base de données", ok: true,  detail: "PostgreSQL 16 — sain" },
-              { name: "Redis",           ok: true,  detail: "Cache opérationnel" },
-              { name: "MinIO",           ok: true,  detail: "Stockage disponible" },
-              { name: "Meilisearch",     ok: true,  detail: "Index à jour" },
-              { name: "Celery Worker",   ok: true,  detail: "3 workers actifs" },
-            ].map(({ name, ok, detail }) => (
+            {["API FastAPI", "Base de données", "Redis", "MinIO", "Meilisearch", "Celery Worker"].map((name) => (
               <div key={name} className="flex items-center justify-between text-sm">
                 <div className="flex items-center gap-2">
-                  <div className={cn("w-2 h-2 rounded-full", ok ? "bg-green-500" : "bg-red-500")} />
+                  <div className="w-2 h-2 rounded-full bg-gray-300" />
                   <span className="text-gray-700 font-medium">{name}</span>
                 </div>
-                <span className="text-xs text-gray-400">{detail}</span>
+                <span className="text-xs text-gray-400">À connecter à /dashboard/supervision</span>
               </div>
             ))}
           </div>
         </SecurityCard>
 
-        {/* Tentatives de connexion */}
         <SecurityCard title="Authentification" status="warning" icon={AlertTriangle}>
           <div className="space-y-4">
             <div className="bg-yellow-50 rounded-xl p-4 text-sm">
-              <div className="font-semibold text-yellow-800 mb-1">
-                3 tentatives échouées détectées
-              </div>
+              <div className="font-semibold text-yellow-800 mb-1">Journal d'authentification non connecté</div>
               <div className="text-yellow-700 text-xs space-y-1">
                 <div className="flex items-center justify-between">
-                  <span>IP 41.207.xxx.xxx</span>
-                  <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> Il y a 52 min</span>
+                  <span>Endpoint d'audit sécurité à brancher</span>
+                  <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> En attente</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span>admin@fasodata.bf (cible)</span>
-                  <span className="text-yellow-600 font-medium">Alerte faible</span>
+                  <span>Tentatives échouées, IP et sessions</span>
+                  <span className="text-yellow-600 font-medium">Non instrumenté</span>
                 </div>
               </div>
             </div>
@@ -151,66 +123,46 @@ export default function SecuritePage() {
             <div className="space-y-2 text-sm">
               <div className="flex items-center justify-between">
                 <span className="text-gray-600">Durée session JWT</span>
-                <span className="font-mono text-gray-800 text-xs">30 min (access)</span>
+                <span className="font-mono text-gray-800 text-xs">30 min access</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-gray-600">Refresh token</span>
                 <span className="font-mono text-gray-800 text-xs">7 jours</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-gray-600">Algorithme</span>
-                <span className="font-mono text-gray-800 text-xs">HS256</span>
-              </div>
-              <div className="flex items-center justify-between">
                 <span className="text-gray-600">Hashage mots de passe</span>
-                <span className="font-mono text-green-700 text-xs font-semibold">bcrypt (3.2.2) ✓</span>
+                <span className="font-mono text-green-700 text-xs font-semibold">bcrypt</span>
               </div>
             </div>
           </div>
         </SecurityCard>
 
-        {/* Clé API Meilisearch */}
-        <SecurityCard title="Clé API Meilisearch" status="ok" icon={Key}>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-xs text-gray-500 mb-1.5">Master Key (masquée)</label>
-              <div className="flex items-center gap-2">
-                <div className="flex-1 font-mono text-xs bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-gray-700">
-                  {showKey ? "changeme_meili_XXXX_YYYY_ZZZZ" : "••••••••••••••••••••••••••••••"}
-                </div>
-                <button
-                  onClick={() => setShowKey(!showKey)}
-                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
+        <SecurityCard title="Clé API Meilisearch" status="pending" icon={Key}>
+          <div className="space-y-4 text-sm">
+            <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 font-mono text-xs text-gray-500">
+              Gérée côté serveur via MEILISEARCH_API_KEY
             </div>
-            <div className="text-xs text-gray-500 bg-blue-50 rounded-xl p-3">
-              La clé est définie via la variable d'environnement <code className="font-mono bg-white px-1 rounded">MEILISEARCH_API_KEY</code> dans le fichier <code className="font-mono bg-white px-1 rounded">.env</code>.
-            </div>
+            <p className="text-xs text-gray-500">
+              La régénération d'une clé nécessite une opération serveur et un redémarrage des services concernés.
+            </p>
             <button
-              onClick={handleRegenerateKey}
-              disabled={regenerating}
-              className="flex items-center gap-2 text-xs text-orange-600 hover:text-orange-700 font-medium"
+              type="button"
+              disabled
+              className="text-xs font-medium text-gray-400 cursor-not-allowed"
             >
-              <RefreshCw className={cn("w-3.5 h-3.5", regenerating && "animate-spin")} />
-              {regenerating ? "Régénération…" : "Régénérer la clé (nécessite redémarrage)"}
+              Régénération indisponible dans l'interface
             </button>
           </div>
         </SecurityCard>
 
-        {/* Recommandations */}
         <SecurityCard title="Recommandations" status="warning" icon={Shield}>
           <div className="space-y-3">
             {[
-              { ok: true,  text: "bcrypt v3 pour les mots de passe" },
-              { ok: true,  text: "CORS configuré (origine restreinte)" },
-              { ok: true,  text: "Rate limiting Nginx (30 req/s)" },
-              { ok: true,  text: "Tokens JWT avec expiration" },
-              { ok: false, text: "HTTPS / TLS — configurer Let's Encrypt" },
-              { ok: false, text: "2FA administrateur — non activé" },
-              { ok: false, text: "Audit log persistant — non implémenté" },
+              { ok: true, text: "Mots de passe hashés avec bcrypt" },
+              { ok: true, text: "Tokens JWT avec expiration" },
+              { ok: false, text: "HTTPS / TLS à configurer en production" },
+              { ok: false, text: "2FA administrateur non activé" },
+              { ok: false, text: "Audit log sécurité non instrumenté" },
             ].map(({ ok, text }) => (
               <div key={text} className="flex items-start gap-2.5 text-sm">
                 {ok

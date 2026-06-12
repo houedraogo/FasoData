@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -55,6 +55,7 @@ const ROLES = [
 
 export default function ConnexionPage() {
   const router          = useRouter();
+  const searchParams    = useSearchParams();
   const { login }       = useAuth();
   const [showPwd, setShowPwd] = useState(false);
   const [activeRole, setActiveRole] = useState<string>("public");
@@ -78,19 +79,22 @@ export default function ConnexionPage() {
     defaultValues: { role: "public" },
   });
 
+  const redirectForRole = (role: "admin" | "institutional" | "public" | undefined) => {
+    const next = searchParams.get("next");
+    if (role === "admin") {
+      router.replace(next?.startsWith("/admin") ? next : "/admin");
+    } else if (role === "institutional") {
+      router.replace(next?.startsWith("/dashboard") ? next : "/dashboard");
+    } else {
+      router.replace(next && !next.startsWith("/admin") && !next.startsWith("/dashboard") ? next : "/datasets");
+    }
+  };
+
   const onLogin = async (data: LoginData) => {
     try {
       await login(data.email, data.password);
       toast.success("Bienvenue !");
-      // Redirection selon le rôle
-      const role = useAuth.getState().user?.role;
-      if (role === "admin") {
-        router.push("/admin");
-      } else if (role === "institutional") {
-        router.push("/dashboard");
-      } else {
-        router.push("/datasets");
-      }
+      redirectForRole(useAuth.getState().user?.role);
     } catch {
       toast.error("Email ou mot de passe incorrect");
     }
@@ -107,7 +111,7 @@ export default function ConnexionPage() {
       });
       await login(data.email, data.password);
       toast.success("Compte créé avec succès !");
-      router.push(data.role === "institutional" ? "/dashboard" : "/datasets");
+      router.push("/onboarding");
     } catch (err: unknown) {
       const status = (err as { response?: { status?: number } })?.response?.status;
       toast.error(status === 409 ? "Email déjà utilisé" : "Erreur lors de la création");
@@ -191,9 +195,12 @@ export default function ConnexionPage() {
             </span>
             <span className="text-gray-300">|</span>
             <span>
-              <span className="font-semibold text-gray-700">FR</span>
-              {" / "}
-              <span className="cursor-pointer hover:text-gray-600">EN</span>
+              <span
+                className="font-semibold text-gray-700"
+                title="L'authentification FasoData est disponible en français pour cette version."
+              >
+                FR
+              </span>
             </span>
           </div>
 

@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { FocusTrap } from "@/components/ui/FocusTrap";
 import toast from "react-hot-toast";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -134,6 +135,75 @@ function IssueRow({
         </div>
       </td>
     </tr>
+  );
+}
+
+function IssueCard({
+  issue, onApply, onResolve, resolving,
+}: {
+  issue: QualityIssue;
+  onApply: (id: string) => void;
+  onResolve: (id: string) => void;
+  resolving: string | null;
+}) {
+  const cfg = SEV_CFG[issue.severity];
+  const busy = resolving === issue.id;
+
+  return (
+    <div className={cn("rounded-xl border p-4", issue.is_resolved ? "border-green-100 bg-green-50/40" : "border-gray-100 bg-white")}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+            Ligne {issue.line_number ?? "-"} · {issue.column_name ?? "Colonne inconnue"}
+          </p>
+          <p className={cn("mt-1 text-sm font-semibold", issue.is_resolved ? "text-gray-400 line-through" : "text-gray-900")}>
+            {issue.raw_value ?? "-"}
+          </p>
+        </div>
+        <span className={cn("shrink-0 rounded-full px-2 py-1 text-[10px] font-bold", cfg.bg, cfg.color)}>
+          {issue.is_resolved ? "Résolu" : cfg.label}
+        </span>
+      </div>
+
+      <div className="mt-3 space-y-2 text-xs">
+        <div>
+          <span className="font-semibold text-gray-500">Problème</span>
+          <p className="mt-0.5 text-gray-700">{issue.problem}</p>
+        </div>
+        {issue.suggestion && (
+          <div>
+            <span className="font-semibold text-gray-500">Suggestion</span>
+            <p className="mt-0.5 font-semibold text-[#16A34A]">{issue.suggestion}</p>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-4 flex justify-end">
+        {issue.is_resolved ? (
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#16A34A]">
+            <CheckCircle className="h-3.5 w-3.5" /> Résolu
+          </span>
+        ) : issue.suggestion ? (
+          <button
+            onClick={() => onApply(issue.id)}
+            disabled={busy}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-[#16A34A] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-green-700 disabled:opacity-50"
+          >
+            {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle className="h-3.5 w-3.5" />}
+            Appliquer
+          </button>
+        ) : (
+          <button
+            onClick={() => onResolve(issue.id)}
+            disabled={busy}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-200 disabled:opacity-50"
+          >
+            {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            Corriger
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -418,8 +488,8 @@ export default function ValidationPage() {
 
       {/* Tableau des problèmes */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
+        <div className="px-5 py-4 border-b border-gray-100 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2 min-w-0">
             <span className="w-1 h-4 bg-[#E04E2F] rounded-full" />
             <h2 className="font-bold text-gray-900 text-sm">Lignes problématiques</h2>
             <span className="text-xs text-gray-400">
@@ -436,7 +506,25 @@ export default function ValidationPage() {
             </span>
           </div>
         </div>
-        <div className="overflow-x-auto">
+        <div className="space-y-3 p-4 sm:hidden">
+          {issues.length === 0 ? (
+            <div className="py-10 text-center text-gray-400">
+              <CheckCircle className="w-8 h-8 mx-auto mb-2 text-gray-200" />
+              <p>Aucun problème détecté</p>
+            </div>
+          ) : (
+            issues.map((issue) => (
+              <IssueCard
+                key={issue.id}
+                issue={issue}
+                onApply={(id) => applySuggestion.mutate(id)}
+                onResolve={(id) => resolveIssue.mutate(id)}
+                resolving={resolvingId}
+              />
+            ))
+          )}
+        </div>
+        <div className="hidden overflow-x-auto sm:block">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
@@ -472,10 +560,15 @@ export default function ValidationPage() {
       {/* Modal confirmation publication */}
       {showPublishConfirm && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowPublishConfirm(false)} />
-          <div className="relative bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4">
-            <h3 className="font-bold text-gray-900 text-lg mb-2">Valider & publier</h3>
-            <p className="text-gray-500 text-sm mb-1">
+          <button type="button" className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowPublishConfirm(false)} aria-label="Fermer la modale" />
+          <FocusTrap
+            onEscape={() => setShowPublishConfirm(false)}
+            labelledBy="publish-modal-title"
+            describedBy="publish-modal-description"
+            className="relative bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4"
+          >
+            <h3 id="publish-modal-title" className="font-bold text-gray-900 text-lg mb-2">Valider & publier</h3>
+            <p id="publish-modal-description" className="text-gray-500 text-sm mb-1">
               Le dataset <strong className="text-gray-800">/{activeCheck?.dataset_slug}</strong> sera
               visible publiquement sur le portail FasoData.
             </p>
@@ -495,17 +588,22 @@ export default function ValidationPage() {
                   : <><Send className="w-4 h-4" /> Publier maintenant</>}
               </button>
             </div>
-          </div>
+          </FocusTrap>
         </div>
       )}
 
       {/* Modal confirmation renvoi */}
       {showRejectConfirm && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowRejectConfirm(false)} />
-          <div className="relative bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4">
-            <h3 className="font-bold text-gray-900 text-lg mb-2">Renvoyer pour révision</h3>
-            <p className="text-gray-500 text-sm mb-6">
+          <button type="button" className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowRejectConfirm(false)} aria-label="Fermer la modale" />
+          <FocusTrap
+            onEscape={() => setShowRejectConfirm(false)}
+            labelledBy="reject-modal-title"
+            describedBy="reject-modal-description"
+            className="relative bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4"
+          >
+            <h3 id="reject-modal-title" className="font-bold text-gray-900 text-lg mb-2">Renvoyer pour révision</h3>
+            <p id="reject-modal-description" className="text-gray-500 text-sm mb-6">
               Le dataset <strong>/{activeCheck?.dataset_slug}</strong> retournera en brouillon.
               L'organisation pourra le corriger et le soumettre à nouveau.
             </p>
@@ -522,7 +620,7 @@ export default function ValidationPage() {
                   : <><RotateCcw className="w-4 h-4" /> Renvoyer</>}
               </button>
             </div>
-          </div>
+          </FocusTrap>
         </div>
       )}
     </div>

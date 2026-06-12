@@ -112,6 +112,7 @@ async def main():
                 ds = Dataset(
                     **ds_data,
                     owner_id=owner_id,
+                    data_origin="seed",
                 )
                 db.add(ds)
                 print(f"Dataset créé : {ds_data['name']}")

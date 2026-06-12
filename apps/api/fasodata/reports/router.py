@@ -19,7 +19,7 @@ router = APIRouter(prefix="/api/reports", tags=["reports"])
 
 COMMODITY_LABELS = {
     "maize": "Maïs", "millet": "Mil", "sorghum": "Sorgho",
-    "rice_local": "Riz local", "cowpea": "Niébé", "groundnut": "Arachide",
+    "rice_local": "Riz local", "rice_imported": "Riz importé", "cowpea": "Niébé", "groundnut": "Arachide",
 }
 REGIONS_ORDER = [
     "Sahel", "Est", "Nord", "Centre-Nord", "Boucle du Mouhoun",

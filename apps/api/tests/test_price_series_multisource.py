@@ -2,6 +2,7 @@ from datetime import date
 
 import pytest
 
+from fasodata.prices import router as prices_router
 from fasodata.prices.models import PriceData
 
 
@@ -12,6 +13,7 @@ async def add_price(
     price: float,
     status: str = "auto",
     n_obs: int = 1,
+    data_origin: str = "public",
 ):
     row = PriceData(
         commodity="sorghum",
@@ -22,6 +24,7 @@ async def add_price(
         quality="retail",
         price_date=date(2026, 5, 18),
         source=source,
+        data_origin=data_origin,
         reporter=source,
         n_obs=n_obs,
         validation_status=status,
@@ -171,3 +174,19 @@ async def test_compare_countries_uses_wfp_validated_data_across_countries(client
     assert by_country["BFA"]["points"][0]["n_obs"] == 4
     assert by_country["MLI"]["points"][0]["price"] == 420.0
     assert by_country["NER"]["points"][0]["price"] == 500.0
+
+
+@pytest.mark.asyncio
+async def test_series_hides_seed_rows_in_production(client, db_session, monkeypatch):
+    monkeypatch.setattr(prices_router.settings, "environment", "production")
+    await add_price(db_session, source="wfp", price=999, data_origin="seed")
+    await add_price(db_session, source="wfp", price=300, data_origin="public")
+
+    resp = await client.get(
+        "/api/prices/series?commodity=sorghum&region=Sahel&sources=wfp&start=2026-05&end=2026-05"
+    )
+
+    assert resp.status_code == 200, resp.text
+    points = resp.json()["points"]
+    assert len(points) == 1
+    assert points[0]["price"] == 300.0

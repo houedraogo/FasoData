@@ -23,7 +23,7 @@ const ChoroplethPrix = dynamic(
 
 const COMMODITIES = [
   { key: "sorghum",    label: "Sorgho",    color: "#E04E2F", seuil: 320 },
-  { key: "rice_local", label: "Riz local", color: "#1A2C42", seuil: 500 },
+  { key: "rice_imported", label: "Riz importé", color: "#1A2C42", seuil: 500 },
   { key: "maize",      label: "Maïs",      color: "#16A34A", seuil: 300 },
   { key: "millet",     label: "Mil",       color: "#D97706", seuil: 350 },
   { key: "cowpea",     label: "Niébé",     color: "#8B5CF6", seuil: 650 },
@@ -74,7 +74,7 @@ export default function CartePrixPage() {
 
   // ── Onglet Carte — prix BFA par région ───────────────────────────────────
 
-  const { data: latestData, isLoading: loadingMap, refetch } = useQuery<LatestPrice[]>({
+  const { data: latestData, isLoading: loadingMap, isFetching: fetchingMap, refetch } = useQuery<LatestPrice[]>({
     queryKey: ["carte-prix-bfa", commodity],
     queryFn: async () => {
       const results = await Promise.allSettled(
@@ -106,13 +106,14 @@ export default function CartePrixPage() {
   const maxRegion  = regionPrices.find((p) => p.price === maxPrice);
   const minRegion  = regionPrices.find((p) => p.price === minPrice);
   const selectedData = selectedRegion ? regionPrices.find((p) => p.region === selectedRegion) : null;
+  const mapHasNoData = !loadingMap && regionPrices.length === 0;
 
   // ── Onglet Comparaison ───────────────────────────────────────────────────
 
-  const { data: compareData, isLoading: loadingCompare } = useQuery<CompareData>({
+  const { data: compareData, isLoading: loadingCompare, isError: compareError, isFetching: fetchingCompare, refetch: refetchCompare } = useQuery<CompareData>({
     queryKey: ["prix-compare", commodity],
     queryFn: async () => {
-      const { data } = await api.get(`/prices/compare?commodity=${commodity}&region=National`);
+      const { data } = await api.get(`/prices/compare-overview?commodity=${commodity}&region=National`);
       return data;
     },
     staleTime: 10 * 60_000,
@@ -133,12 +134,12 @@ export default function CartePrixPage() {
             </div>
             <div>
               <h1 className="text-white font-bold text-lg leading-tight">Carte des prix alimentaires</h1>
-              <p className="text-white/50 text-xs">Burkina Faso · Mali · Niger · Données WFP / SONAGESS</p>
+              <p className="text-white/50 text-xs">Burkina Faso · Mali · Niger · sources publiques HDX/WFP</p>
             </div>
           </div>
           <button onClick={() => refetch()}
             className="p-2 text-white/50 hover:text-white hover:bg-white/10 rounded-lg transition-colors">
-            <RefreshCw className="w-4 h-4" />
+            <RefreshCw className={cn("w-4 h-4", fetchingMap && "animate-spin")} />
           </button>
         </div>
 
@@ -190,6 +191,19 @@ export default function CartePrixPage() {
               {loadingMap ? (
                 <div className="space-y-2">
                   {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-12 bg-gray-100 rounded-xl animate-pulse" />)}
+                </div>
+              ) : mapHasNoData ? (
+                <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-3 py-6 text-center">
+                  <Database className="mx-auto mb-2 h-8 w-8 text-gray-300" />
+                  <p className="text-sm font-medium text-gray-600">Aucun prix vérifié disponible</p>
+                  <p className="mt-1 text-xs text-gray-400">Aucune observation publique ou terrain validée pour ce produit.</p>
+                  <button
+                    onClick={() => refetch()}
+                    className="mt-3 inline-flex items-center gap-2 text-xs font-semibold text-[#E04E2F] hover:underline"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    Réessayer
+                  </button>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -244,6 +258,11 @@ export default function CartePrixPage() {
               <div className="space-y-1">
                 {loadingMap
                   ? Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-9 bg-gray-100 rounded-lg animate-pulse" />)
+                  : mapHasNoData ? (
+                    <div className="rounded-xl border border-dashed border-gray-200 px-3 py-6 text-center text-xs text-gray-400">
+                      Les régions apparaîtront après ingestion de prix vérifiés.
+                    </div>
+                  )
                   : ALL_REGIONS.map((region) => {
                     const rp = regionPrices.find((p) => p.region === region);
                     const price = rp?.price ?? 0;
@@ -290,8 +309,24 @@ export default function CartePrixPage() {
                   </div>
                 </div>
               )}
+              {mapHasNoData && (
+                <div className="absolute inset-4 flex items-center justify-center bg-white/80 rounded-2xl backdrop-blur-sm">
+                  <div className="max-w-sm rounded-2xl border border-dashed border-gray-200 bg-white px-6 py-5 text-center shadow-sm">
+                    <Database className="mx-auto mb-3 h-10 w-10 text-gray-300" />
+                    <p className="text-sm font-semibold text-gray-700">Carte sans données pour {activeCommodity.label}</p>
+                    <p className="mt-1 text-xs text-gray-400">Changez de produit ou relancez le chargement.</p>
+                    <button
+                      onClick={() => refetch()}
+                      className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#1A2C42] px-4 py-2 text-xs font-semibold text-white hover:bg-[#223a57]"
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" />
+                      Réessayer
+                    </button>
+                  </div>
+                </div>
+              )}
               <div className="absolute bottom-6 left-6 text-[10px] text-gray-400 bg-white/80 px-2 py-1 rounded-lg backdrop-blur-sm">
-                Données WFP VAM / SONAGESS · Burkina Faso
+                Source publique HDX/WFP · Burkina Faso
               </div>
             </div>
           </div>
@@ -318,6 +353,19 @@ export default function CartePrixPage() {
           {loadingCompare ? (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               {Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-32 bg-white rounded-2xl border border-gray-100 animate-pulse" />)}
+            </div>
+          ) : compareError ? (
+            <div className="flex flex-col items-center rounded-2xl border border-dashed border-gray-200 bg-white py-16 text-center text-gray-400">
+              <AlertTriangle className="w-12 h-12 mb-3 text-amber-300" />
+              <p className="font-semibold text-gray-700">Comparaison indisponible</p>
+              <p className="mt-1 text-sm">Les données publiques WFP inter-pays n'ont pas pu être chargées.</p>
+              <button
+                onClick={() => refetchCompare()}
+                className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#1A2C42] px-4 py-2 text-xs font-semibold text-white hover:bg-[#223a57]"
+              >
+                <RefreshCw className={cn("h-3.5 w-3.5", fetchingCompare && "animate-spin")} />
+                Réessayer
+              </button>
             </div>
           ) : compareData ? (
             <>
@@ -379,7 +427,7 @@ export default function CartePrixPage() {
                     et {compareData.stats.most_expensive?.name} ({compareData.stats.most_expensive?.price} CFA/kg)
                     pour <em>{compareData.commodity_label}</em> au niveau national.
                   </p>
-                  <span className="text-xs text-white/40">Source WFP VAM · {new Date().getFullYear()}</span>
+                  <span className="text-xs text-white/40">Source HDX/WFP · {new Date().getFullYear()}</span>
                 </div>
               )}
 
@@ -449,13 +497,13 @@ export default function CartePrixPage() {
 
               {/* Source */}
               <p className="text-xs text-gray-400 text-right">
-                Source : WFP VAM Food Prices · SONAGESS Burkina Faso · données 2020–2025
+                Source : HDX/WFP Food Prices · données publiques et séries FasoData validées
               </p>
             </>
           ) : (
             <div className="flex flex-col items-center py-20 text-gray-400">
               <Globe className="w-12 h-12 mb-3 opacity-30" />
-              <p>Aucune donnée de comparaison disponible</p>
+              <p>Aucune donnée vérifiée de comparaison disponible</p>
             </div>
           )}
         </div>

@@ -40,13 +40,51 @@ def _get_sync_session():
     return Session(), engine
 
 
+def _build_national_price_records(records):
+    from fasodata.prices.wfp_service import WfpPriceRecord
+
+    grouped: dict[tuple[str, date, str, str], list[WfpPriceRecord]] = {}
+    for record in records:
+        if record.price <= 0 or record.region == "National":
+            continue
+        grouped.setdefault(
+            (record.commodity, record.price_date, record.unit, record.provider),
+            [],
+        ).append(record)
+
+    national_records: list[WfpPriceRecord] = []
+    for (commodity, price_date, unit, provider), items in grouped.items():
+        markets = {item.market for item in items if item.market}
+        if len(items) < 2:
+            continue
+        avg_price = round(sum(item.price for item in items) / len(items), 1)
+        raw_names = sorted({item.raw_commodity for item in items if item.raw_commodity})
+        national_records.append(
+            WfpPriceRecord(
+                commodity=commodity,
+                region="National",
+                market=None,
+                price=avg_price,
+                unit=unit,
+                quality="moyenne nationale",
+                price_date=price_date,
+                raw_commodity=raw_names[0] if raw_names else commodity,
+                raw_id=f"aggregate:national:{commodity}:{price_date.isoformat()}",
+                provider=provider,
+                n_obs=len(items),
+                notes_suffix=f"moyenne nationale calculee depuis {len(markets) or len(items)} marches",
+            )
+        )
+    return national_records
+
+
 @celery_app.task(name="fasodata.prices.tasks.fetch_wfp_prices", bind=True)
 def fetch_wfp_prices(
     self,
     start_date_str: str | None = None,
     end_date_str: str | None = None,
 ):
-    """Recupere les prix WFP DataBridges et les upsert dans price_data."""
+    """Recupere les prix WFP/HDX et les upsert dans price_data."""
     from sqlalchemy import select
 
     from fasodata.core.config import get_settings
@@ -84,7 +122,9 @@ def fetch_wfp_prices(
     skipped = 0
 
     try:
-        for record in records:
+        all_records = [*records, *_build_national_price_records(records)]
+
+        for record in all_records:
             if record.price <= 0:
                 skipped += 1
                 continue
@@ -99,14 +139,19 @@ def fetch_wfp_prices(
                 )
             ).scalar_one_or_none()
 
-            notes = f"WFP DataBridges PriceDaily; commodity={record.raw_commodity}"
+            notes = f"{record.provider}; commodity={record.raw_commodity}"
             if record.raw_id:
                 notes = f"{notes}; id={record.raw_id}"
+            if record.notes_suffix:
+                notes = f"{notes}; {record.notes_suffix}"
 
             if existing:
                 existing.price = record.price
                 existing.unit = record.unit
                 existing.quality = record.quality
+                existing.reporter = record.provider
+                existing.data_origin = "public"
+                existing.n_obs = record.n_obs
                 existing.notes = notes
                 existing.validation_status = "auto"
                 updated += 1
@@ -121,8 +166,9 @@ def fetch_wfp_prices(
                         quality=record.quality,
                         price_date=record.price_date,
                         source="wfp",
-                        reporter="WFP DataBridges",
-                        n_obs=1,
+                        data_origin="public",
+                        reporter=record.provider,
+                        n_obs=record.n_obs,
                         notes=notes,
                         validation_status="auto",
                     )
@@ -136,6 +182,7 @@ def fetch_wfp_prices(
             "start_date": start_date.isoformat(),
             "end_date": end_date.isoformat(),
             "fetched": len(records),
+            "national_aggregates": len(all_records) - len(records),
             "created": created,
             "updated": updated,
             "skipped": skipped,
@@ -299,6 +346,7 @@ def aggregate_daily_sms(self, target_date_str: str | None = None):
                 price=mean_p,
                 price_date=target_date,
                 source="aggregated",
+                data_origin="field",
                 quality="agrégé SMS",
                 n_obs=n,
                 validation_status="auto",
@@ -367,7 +415,7 @@ def _notify_admin_anomaly(
     settings = get_settings()
 
     COMMODITY_LABELS_FR = {
-        "sorghum": "Sorgho", "rice_local": "Riz local",
+        "sorghum": "Sorgho", "rice_local": "Riz local", "rice_imported": "Riz importé",
         "maize": "Maïs", "millet": "Mil",
         "cowpea": "Niébé", "groundnut": "Arachide",
     }

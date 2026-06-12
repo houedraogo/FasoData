@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, BarChart3, Database, Download, Globe, Map, Search, Shield, Users } from "lucide-react";
+import { ArrowRight, BarChart3, Building2, Database, Download, Globe, GraduationCap, Landmark, Map, Search, Shield, Users } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import PrixDuJourWidget from "@/components/home/PrixDuJourWidget";
@@ -33,6 +33,33 @@ export default function HomePage() {
     { icon: Download, title: t("home.feature.export.title"), description: t("home.feature.export.description") },
     { icon: Shield, title: t("home.feature.verified.title"), description: t("home.feature.verified.description") },
     { icon: Globe, title: t("home.feature.open.title"), description: t("home.feature.open.description") },
+  ];
+
+  const audiences = [
+    {
+      icon: GraduationCap,
+      title: t("home.audience.academic.title"),
+      description: t("home.audience.academic.description"),
+      color: "bg-blue-50 text-blue-700 border-blue-100",
+    },
+    {
+      icon: Building2,
+      title: t("home.audience.business.title"),
+      description: t("home.audience.business.description"),
+      color: "bg-amber-50 text-amber-700 border-amber-100",
+    },
+    {
+      icon: Users,
+      title: t("home.audience.ngo.title"),
+      description: t("home.audience.ngo.description"),
+      color: "bg-green-50 text-green-700 border-green-100",
+    },
+    {
+      icon: Landmark,
+      title: t("home.audience.state.title"),
+      description: t("home.audience.state.description"),
+      color: "bg-slate-50 text-slate-700 border-slate-100",
+    },
   ];
 
   return (
@@ -130,6 +157,27 @@ export default function HomePage() {
             <Link href="/datasets" className="btn-secondary">
               {t("home.allCategories")} <ArrowRight className="w-4 h-4" />
             </Link>
+          </div>
+        </div>
+      </section>
+
+      <section className="py-16 bg-white border-t border-gray-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-2xl mb-10">
+            <h2 className="text-3xl font-bold text-faso-navy mb-3">{t("home.audiencesTitle")}</h2>
+            <p className="text-gray-500 leading-relaxed">{t("home.audiencesSubtitle")}</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
+            {audiences.map(({ icon: Icon, title, description, color }) => (
+              <div key={title} className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+                <div className={`mb-4 flex h-11 w-11 items-center justify-center rounded-xl border ${color}`}>
+                  <Icon className="h-5 w-5" />
+                </div>
+                <h3 className="font-bold text-faso-navy mb-2">{title}</h3>
+                <p className="text-sm text-gray-500 leading-relaxed">{description}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>

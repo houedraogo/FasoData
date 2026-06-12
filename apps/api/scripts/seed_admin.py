@@ -22,10 +22,6 @@ async def main():
     engine = create_async_engine(settings.database_url)
     Session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
-    async with engine.begin() as conn:
-        from fasodata.core.database import Base
-        await conn.run_sync(Base.metadata.create_all)
-
     async with Session() as db:
         result = await db.execute(
             select(User).where(User.email == settings.first_admin_email)

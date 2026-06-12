@@ -81,6 +81,11 @@ class Settings(BaseSettings):
     wfp_prices_lookback_days: int = 45
     wfp_prices_page_size: int = 1000
     wfp_prices_timeout_seconds: int = 30
+    wfp_public_prices_url: str = (
+        "https://data.humdata.org/dataset/bfd82e1f-0296-48a8-ac28-c11e028be5ed/"
+        "resource/0eca67d6-e297-4f5e-9132-7dc42891b749/download/"
+        "wfp_food_prices_bfa.csv"
+    )
 
     # WhatsApp Cloud API - alertes prix
     whatsapp_graph_api_url: str = "https://graph.facebook.com/v25.0"

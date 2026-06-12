@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
@@ -55,7 +55,7 @@ const ROLES = [
 
 // ── Page ────────────────────────────────────────────────────────────────────
 
-export default function ConnexionPage() {
+function ConnexionInner() {
   const router          = useRouter();
   const searchParams    = useSearchParams();
   const { login }       = useAuth();
@@ -415,5 +415,13 @@ export default function ConnexionPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ConnexionPage() {
+  return (
+    <Suspense>
+      <ConnexionInner />
+    </Suspense>
   );
 }

@@ -102,34 +102,98 @@ export default function HomePage() {
       <section className="relative bg-faso-navy overflow-hidden">
         <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.06)_0,rgba(255,255,255,0)_38%),radial-gradient(circle_at_top_right,rgba(239,75,43,0.18),transparent_38%)]" />
 
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-          <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/10 rounded-full text-white/80 text-sm mb-6">
-              <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-              {t("home.badge")}
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 lg:py-16">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:gap-12">
+
+            {/* ── Texte gauche ── */}
+            <div className="flex-1 max-w-2xl">
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/10 rounded-full text-white/80 text-sm mb-6">
+                <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                {t("home.badge")}
+              </div>
+
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white leading-tight mb-6">
+                {t("home.titleStart")} <span className="text-faso-red">Burkina Faso</span>{" "}
+                {t("home.titleEnd")}
+              </h1>
+
+              <p className="text-lg text-white/70 mb-10 leading-relaxed">
+                {t("home.description")}
+              </p>
+
+              <div className="flex flex-col sm:flex-row gap-4">
+                <Link href="/datasets" className="btn-primary text-base px-6 py-3">
+                  {t("home.exploreCta")} <ArrowRight className="w-5 h-5" />
+                </Link>
+                <Link
+                  href="/carte"
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-white/10 text-white font-semibold rounded-xl hover:bg-white/20 transition-all"
+                >
+                  <Map className="w-5 h-5" />
+                  {t("home.mapCta")}
+                </Link>
+              </div>
             </div>
 
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white leading-tight mb-6">
-              {t("home.titleStart")} <span className="text-faso-red">Burkina Faso</span>{" "}
-              {t("home.titleEnd")}
-            </h1>
+            {/* ── Illustration droite ── */}
+            <div className="hidden lg:flex flex-shrink-0 w-[420px] xl:w-[480px] flex-col gap-3 mt-10 lg:mt-0">
+              {/* Card principale — stats live */}
+              <div className="bg-white/10 backdrop-blur-sm border border-white/15 rounded-2xl p-5">
+                <p className="text-white/50 text-xs font-semibold uppercase tracking-widest mb-3">Prix des céréales · Burkina Faso</p>
+                <div className="grid grid-cols-3 gap-3">
+                  {[
+                    { label: "Sorgho", price: "312", unit: "CFA/kg", trend: "+2.1%", up: true },
+                    { label: "Maïs", price: "302", unit: "CFA/kg", trend: "-0.8%", up: false },
+                    { label: "Mil", price: "350", unit: "CFA/kg", trend: "+1.4%", up: true },
+                  ].map((item) => (
+                    <div key={item.label} className="bg-white/8 rounded-xl p-3">
+                      <p className="text-white/50 text-[10px] mb-1">{item.label}</p>
+                      <p className="text-white font-bold text-lg leading-none">{item.price}</p>
+                      <p className="text-white/40 text-[9px] mt-0.5">{item.unit}</p>
+                      <p className={`text-[10px] font-semibold mt-1.5 ${item.up ? "text-green-400" : "text-red-400"}`}>{item.trend}</p>
+                    </div>
+                  ))}
+                </div>
+                {/* Mini sparkline SVG */}
+                <div className="mt-3 h-12 opacity-40">
+                  <svg viewBox="0 0 380 48" className="w-full h-full">
+                    <polyline points="0,38 50,30 100,35 150,22 200,28 250,18 300,24 380,14" fill="none" stroke="#F5A623" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <polyline points="0,42 50,38 100,40 150,32 200,36 250,28 300,34 380,22" fill="none" stroke="#E04E2F" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="4 2"/>
+                  </svg>
+                </div>
+              </div>
 
-            <p className="text-lg text-white/70 mb-10 leading-relaxed max-w-2xl">
-              {t("home.description")}
-            </p>
+              {/* Deux mini-cards */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-white/10 backdrop-blur-sm border border-white/15 rounded-2xl p-4 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[#E04E2F]/30 flex items-center justify-center shrink-0">
+                    <Database className="w-5 h-5 text-[#E04E2F]" />
+                  </div>
+                  <div>
+                    <p className="text-white font-bold text-xl leading-none">1 200+</p>
+                    <p className="text-white/50 text-xs mt-0.5">Datasets publics</p>
+                  </div>
+                </div>
+                <div className="bg-white/10 backdrop-blur-sm border border-white/15 rounded-2xl p-4 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-green-500/20 flex items-center justify-center shrink-0">
+                    <BarChart3 className="w-5 h-5 text-green-400" />
+                  </div>
+                  <div>
+                    <p className="text-white font-bold text-xl leading-none">15k+</p>
+                    <p className="text-white/50 text-xs mt-0.5">Téléchargements/mois</p>
+                  </div>
+                </div>
+              </div>
 
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Link href="/datasets" className="btn-primary text-base px-6 py-3">
-                {t("home.exploreCta")} <ArrowRight className="w-5 h-5" />
-              </Link>
-              <Link
-                href="/carte"
-                className="inline-flex items-center gap-2 px-6 py-3 bg-white/10 text-white font-semibold rounded-xl hover:bg-white/20 transition-all"
-              >
-                <Map className="w-5 h-5" />
-                {t("home.mapCta")}
-              </Link>
+              {/* Tag sources */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {["WFP", "SONAGESS", "INSD", "Ministères", "ONG"].map((src) => (
+                  <span key={src} className="px-2.5 py-1 bg-white/8 border border-white/12 rounded-full text-white/60 text-xs font-medium">{src}</span>
+                ))}
+                <span className="text-white/30 text-xs">· sources vérifiées</span>
+              </div>
             </div>
+
           </div>
         </div>
 

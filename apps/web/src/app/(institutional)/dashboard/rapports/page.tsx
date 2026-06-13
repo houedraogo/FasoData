@@ -57,7 +57,28 @@ export default function RapportsPage() {
   const [isPrixPdf, setIsPrixPdf]         = useState(false);
   const [prixCountry, setPrixCountry]     = useState("BFA");
   const [prixMonths, setPrixMonths]       = useState(3);
-  const [jobs, setJobs]                   = useState<ExportJob[]>([]);
+  const [jobs, setJobsRaw]                = useState<ExportJob[]>([]);
+
+  // Persistance localStorage
+  const setJobs: typeof setJobsRaw = (updater) => {
+    setJobsRaw((prev) => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      const serializable = next.map((j) => ({ ...j, downloadUrl: undefined, createdAt: j.createdAt instanceof Date ? j.createdAt.toISOString() : j.createdAt }));
+      try { localStorage.setItem("fasodata_export_jobs", JSON.stringify(serializable.slice(0, 50))); } catch {}
+      return next;
+    });
+  };
+
+  // Charger l'historique au montage
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("fasodata_export_jobs");
+      if (stored) {
+        const parsed = JSON.parse(stored) as (Omit<ExportJob, "createdAt"> & { createdAt: string })[];
+        setJobsRaw(parsed.map((j) => ({ ...j, createdAt: new Date(j.createdAt), status: j.status === "running" ? "error" : j.status })));
+      }
+    } catch {}
+  }, []);
 
   // Polling refs pour les tâches en cours
   const pollingRefs = useRef<Record<string, ReturnType<typeof setInterval>>>({});
@@ -389,10 +410,15 @@ export default function RapportsPage() {
             <div className="w-8 h-8 bg-faso-navy/10 rounded-lg flex items-center justify-center">
               <FileText className="w-4 h-4 text-faso-navy" />
             </div>
-            <h2 className="font-bold text-gray-900">Exports de cette session</h2>
+            <h2 className="font-bold text-gray-900">Historique des exports</h2>
           </div>
           {jobs.length > 0 && (
-            <span className="text-xs text-gray-400">{jobs.length} export(s)</span>
+            <button
+              onClick={() => { setJobs([]); try { localStorage.removeItem("fasodata_export_jobs"); } catch {} }}
+              className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+            >
+              Vider l'historique
+            </button>
           )}
         </div>
 
@@ -460,7 +486,7 @@ export default function RapportsPage() {
         <ul className="space-y-1 text-blue-700 text-xs">
           <li>• Les exports CSV et PDF sont générés instantanément et téléchargés directement.</li>
           <li>• Le dataset <strong>Prix alimentaires</strong> exporte jusqu'à 10 000 observations depuis la base FasoData.</li>
-          <li>• L'historique des exports est conservé pendant la session courante.</li>
+          <li>• L'historique des exports est conservé entre les sessions (50 derniers exports).</li>
           <li>• Pour des exports filtrés avancés, consultez la <a href="/developers" className="underline">documentation API</a>.</li>
         </ul>
       </div>

@@ -1,7 +1,8 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
-import { Database, Github, Mail } from "lucide-react";
+import { Github, Mail } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
 
 export function Footer() {
@@ -13,9 +14,7 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="md:col-span-1">
             <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 bg-faso-red rounded-lg flex items-center justify-center">
-                <Database className="w-4 h-4 text-white" />
-              </div>
+              <Image src="/picto.png" alt="FasoData" width={36} height={36} className="w-9 h-9 rounded-lg object-cover shrink-0" />
               <span className="font-bold text-lg">
                 Faso<span className="font-light text-faso-red">Data</span>
               </span>

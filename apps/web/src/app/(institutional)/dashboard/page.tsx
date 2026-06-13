@@ -427,6 +427,7 @@ export default function DashboardPage() {
       toast.success(`Programme "${created.name}" créé avec succès !`);
       setShowNouveauProg(false);
       setProg({ nom: "", type: "Sécurité alimentaire", regions: [], debut: "", fin: "", objectif: "" });
+      router.push("/dashboard/programmes");
     },
     onError: () => {
       toast.error("Impossible de créer le programme");

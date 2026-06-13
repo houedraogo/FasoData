@@ -2,6 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
+import Image from "next/image";
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -146,11 +147,9 @@ export default function InscriptionPage() {
 
         <div className="relative text-center space-y-8 max-w-sm">
           {/* Logo */}
-          <div className="flex items-center justify-center gap-3">
-            <div className="w-14 h-14 bg-faso-red rounded-2xl flex items-center justify-center shadow-lg">
-              <Database className="w-8 h-8 text-white" />
-            </div>
-            <div className="text-left">
+          <div className="flex items-center justify-center">
+            <Image src="/logo.png" alt="FasoData" width={200} height={62} className="h-14 w-auto brightness-0 invert" priority />
+            <div className="text-left hidden">
               <div className="text-3xl font-bold text-white">FasoData</div>
               <div className="text-white/60 text-sm">Burkina Faso Open Data</div>
             </div>
@@ -189,11 +188,8 @@ export default function InscriptionPage() {
 
           {/* Logo mobile */}
           <div className="lg:hidden flex items-center gap-2 mb-8">
-            <Link href="/" className="flex items-center gap-2">
-              <div className="w-9 h-9 bg-faso-navy rounded-xl flex items-center justify-center">
-                <Database className="w-5 h-5 text-white" />
-              </div>
-              <span className="font-bold text-faso-navy text-lg">FasoData</span>
+            <Link href="/" className="flex items-center">
+              <Image src="/logo.png" alt="FasoData" width={140} height={44} className="h-10 w-auto" />
             </Link>
           </div>
 

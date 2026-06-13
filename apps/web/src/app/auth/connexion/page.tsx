@@ -2,6 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
+import Image from "next/image";
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -137,14 +138,7 @@ function ConnexionInner() {
 
         {/* Logo */}
         <div className="px-10 pt-10">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-[#E04E2F] rounded-xl flex items-center justify-center shadow-lg">
-              <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6 text-white" stroke="currentColor" strokeWidth={2}>
-                <path d="M3 17l4-8 4 4 4-6 4 10" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </div>
-            <span className="text-white font-bold text-xl tracking-tight">FasoData</span>
-          </div>
+          <Image src="/logo.png" alt="FasoData" width={160} height={50} className="h-11 w-auto brightness-0 invert" priority />
         </div>
 
         {/* Quote centrale */}

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -87,13 +88,8 @@ export default function InstitutionalLayout({ children }: { children: React.Reac
 
         {/* Logo */}
         <div className="px-5 pt-6 pb-5">
-          <Link href="/" className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-[#E04E2F] rounded-lg flex items-center justify-center shrink-0">
-              <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5 text-white" stroke="currentColor" strokeWidth={2.5}>
-                <path d="M3 17l4-8 4 4 4-6 4 10" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </div>
-            <span className="text-white font-bold text-base tracking-tight">FasoData</span>
+          <Link href="/" className="flex items-center">
+            <Image src="/logo.png" alt="FasoData" width={130} height={40} className="h-8 w-auto brightness-0 invert" priority />
           </Link>
         </div>
 
@@ -160,13 +156,8 @@ export default function InstitutionalLayout({ children }: { children: React.Reac
           <aside className="relative w-72 max-w-[85vw] bg-[#1A2C42] flex flex-col h-full shadow-2xl">
             {/* Header drawer */}
             <div className="flex items-center justify-between px-5 pt-6 pb-5">
-              <Link href="/" onClick={() => setDrawerOpen(false)} className="flex items-center gap-2.5">
-                <div className="w-8 h-8 bg-[#E04E2F] rounded-lg flex items-center justify-center">
-                  <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5 text-white" stroke="currentColor" strokeWidth={2.5}>
-                    <path d="M3 17l4-8 4 4 4-6 4 10" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </div>
-                <span className="text-white font-bold text-base">FasoData</span>
+              <Link href="/" onClick={() => setDrawerOpen(false)} className="flex items-center">
+                <Image src="/logo.png" alt="FasoData" width={120} height={36} className="h-8 w-auto brightness-0 invert" />
               </Link>
               <button onClick={() => setDrawerOpen(false)}
                 className="w-8 h-8 flex items-center justify-center text-white/40 hover:text-white rounded-lg">

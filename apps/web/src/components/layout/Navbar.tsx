@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
@@ -59,14 +60,15 @@ export function Navbar() {
     <nav className="sticky top-0 z-50 bg-faso-navy/95 backdrop-blur-md border-b border-white/10 shadow-lg">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          <Link href="/" className="flex items-center gap-3 group">
-            <div className="w-9 h-9 bg-faso-red rounded-xl flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
-              <Database className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <span className="text-white font-bold text-lg leading-none">Faso</span>
-              <span className="text-faso-red font-light text-lg leading-none">Data</span>
-            </div>
+          <Link href="/" className="flex items-center group">
+            <Image
+              src="/logo.png"
+              alt="FasoData"
+              width={160}
+              height={48}
+              className="h-10 w-auto group-hover:opacity-90 transition-opacity"
+              priority
+            />
           </Link>
 
           <div className="hidden lg:flex items-center gap-1">

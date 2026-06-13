@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -48,13 +49,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* Logo */}
         <div className="px-5 pt-6 pb-5">
-          <Link href="/" className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-[#E04E2F] rounded-lg flex items-center justify-center shrink-0">
-              <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5 text-white" stroke="currentColor" strokeWidth={2.5}>
-                <path d="M3 17l4-8 4 4 4-6 4 10" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </div>
-            <span className="text-white font-bold text-base tracking-tight">FasoData</span>
+          <Link href="/" className="flex items-center">
+            <Image src="/logo.png" alt="FasoData" width={130} height={40} className="h-8 w-auto brightness-0 invert" priority />
           </Link>
         </div>
 

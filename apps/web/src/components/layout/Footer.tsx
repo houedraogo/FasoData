@@ -78,7 +78,7 @@ export function Footer() {
               <a href="mailto:contact@fasodata.bf" className="text-white/60 hover:text-white transition-colors">
                 <Mail className="w-5 h-5" />
               </a>
-              <a href="https://github.com" className="text-white/60 hover:text-white transition-colors">
+              <a href="https://github.com/houedraogo/FasoData" target="_blank" rel="noopener noreferrer" className="text-white/60 hover:text-white transition-colors">
                 <Github className="w-5 h-5" />
               </a>
             </div>

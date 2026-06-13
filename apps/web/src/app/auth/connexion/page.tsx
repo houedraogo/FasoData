@@ -186,7 +186,7 @@ function ConnexionInner() {
           <div className="hidden lg:flex items-center justify-end gap-4 mb-12 text-sm text-gray-400">
             <span>
               Besoin d'aide ?{" "}
-              <a href="#" className="text-[#E04E2F] hover:underline font-medium">
+              <a href="/contact" className="text-[#E04E2F] hover:underline font-medium">
                 Centre d'assistance →
               </a>
             </span>
@@ -388,9 +388,9 @@ function ConnexionInner() {
                 className="w-4 h-4 mt-0.5 rounded border-gray-300 text-[#E04E2F] focus:ring-[#E04E2F]/20 shrink-0" />
               <span className="text-xs text-gray-500 leading-relaxed">
                 J'accepte les{" "}
-                <a href="#" className="text-[#E04E2F] hover:underline">conditions d'utilisation</a>
+                <a href="/conditions" target="_blank" className="text-[#E04E2F] hover:underline">conditions d'utilisation</a>
                 {" "}et la{" "}
-                <a href="#" className="text-[#E04E2F] hover:underline">politique de confidentialité</a>
+                <a href="/confidentialite" target="_blank" className="text-[#E04E2F] hover:underline">politique de confidentialité</a>
                 {" "}(RGPD).
               </span>
             </label>

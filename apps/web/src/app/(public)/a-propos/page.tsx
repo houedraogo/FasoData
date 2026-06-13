@@ -251,7 +251,7 @@ export default function AProposPage() {
           </div>
           <div className="text-center mt-8">
             <a
-              href="https://github.com"
+              href="https://github.com/houedraogo/FasoData"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-faso-navy transition-colors"

@@ -27,7 +27,7 @@ services:
       context: ..
       dockerfile: infra/docker/Dockerfile.web.prod
       args:
-        NEXT_PUBLIC_API_URL: https://fasodata.com/api
+        NEXT_PUBLIC_API_URL: /api
     env_file:
       - ../.env.production
     environment:

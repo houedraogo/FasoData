@@ -1,11 +1,19 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { ArrowRight, BarChart3, Building2, Database, Download, Globe, GraduationCap, Landmark, Map, Search, Shield, Users } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import PrixDuJourWidget from "@/components/home/PrixDuJourWidget";
 import { useLanguage } from "@/lib/i18n";
+
+interface PublicStats { datasets: number; categories: number; downloads: number; price_observations: number; }
+
+function fmt(n: number): string {
+  if (n >= 1000) return `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k+`;
+  return n > 0 ? `${n}` : "—";
+}
 
 const categoryMeta = [
   { fr: "Agriculture", en: "Agriculture", icon: "A", count: 124, color: "bg-green-50 text-green-700 border-green-200" },
@@ -18,6 +26,14 @@ const categoryMeta = [
 
 export default function HomePage() {
   const { locale, t } = useLanguage();
+  const [publicStats, setPublicStats] = useState<PublicStats | null>(null);
+
+  useEffect(() => {
+    fetch("/api/datasets/public-stats")
+      .then((r) => r.json())
+      .then(setPublicStats)
+      .catch(() => {});
+  }, []);
 
   const showcase =
     locale === "fr"
@@ -53,10 +69,10 @@ export default function HomePage() {
         };
 
   const stats = [
-    { value: "1 200+", label: t("home.stats.datasets") },
-    { value: "45", label: t("home.stats.categories") },
-    { value: "320+", label: t("home.stats.partners") },
-    { value: "15 000+", label: t("home.stats.downloads") },
+    { value: publicStats ? fmt(publicStats.datasets) : "—", label: t("home.stats.datasets") },
+    { value: publicStats ? `${publicStats.categories}` : "—", label: t("home.stats.categories") },
+    { value: publicStats ? fmt(publicStats.price_observations) : "—", label: locale === "fr" ? "Relevés de prix" : "Price records" },
+    { value: publicStats ? fmt(publicStats.downloads) : "—", label: t("home.stats.downloads") },
   ];
 
   const features = [

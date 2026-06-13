@@ -125,6 +125,43 @@ def _price_row_to_dict(row) -> dict:
     }
 
 
+@router.get("/public-stats")
+async def public_stats(db: AsyncSession = Depends(get_db)):
+    """Stats publiques agrégées pour la homepage — pas d'auth requise."""
+    await ensure_public_price_dataset(db)
+
+    ds_q = select(Dataset).where(*_visible_dataset_filters(), Dataset.status == DatasetStatus.published)
+
+    total_result = await db.execute(select(func.count()).select_from(ds_q.subquery()))
+    total_datasets = total_result.scalar_one()
+
+    cat_result = await db.execute(
+        select(func.count(func.distinct(Dataset.category))).select_from(ds_q.subquery())
+    )
+    total_categories = cat_result.scalar_one()
+
+    dl_result = await db.execute(
+        select(func.coalesce(func.sum(Dataset.download_count), 0)).select_from(ds_q.subquery())
+    )
+    total_downloads = dl_result.scalar_one()
+
+    from fasodata.prices.models import PriceData as PriceModel
+    from fasodata.core.data_origin import visible_origin_filter as _vof
+    price_filter = _vof(PriceModel.data_origin, settings)
+    price_q = select(func.count()).select_from(PriceModel)
+    if price_filter is not None:
+        price_q = price_q.where(price_filter)
+    price_result = await db.execute(price_q)
+    total_prices = price_result.scalar_one()
+
+    return {
+        "datasets": total_datasets,
+        "categories": total_categories,
+        "downloads": int(total_downloads),
+        "price_observations": total_prices,
+    }
+
+
 @router.get("", response_model=DatasetListOut)
 async def list_datasets(
     page: int = Query(1, ge=1),

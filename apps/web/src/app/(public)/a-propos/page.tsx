@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   Database, Globe, Shield, Users, BarChart3,
@@ -5,14 +8,11 @@ import {
   GraduationCap, Building2, Landmark,
 } from "lucide-react";
 
-// ── Données statiques ─────────────────────────────────────────────────────────
-
-const STATS = [
-  { value: "500+", label: "Datasets disponibles", icon: Database },
-  { value: "50+",  label: "Organisations partenaires", icon: Users },
-  { value: "12",   label: "Catégories thématiques", icon: BarChart3 },
-  { value: "100%", label: "Open source", icon: Globe },
-];
+interface PublicStats { datasets: number; categories: number; downloads: number; price_observations: number; }
+function fmt(n: number): string {
+  if (n >= 1000) return `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k+`;
+  return n > 0 ? `${n}` : "—";
+}
 
 const VALEURS = [
   {
@@ -56,6 +56,22 @@ const CATEGORIES = [
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function AProposPage() {
+  const [publicStats, setPublicStats] = useState<PublicStats | null>(null);
+
+  useEffect(() => {
+    fetch("/api/datasets/public-stats")
+      .then((r) => r.json())
+      .then(setPublicStats)
+      .catch(() => {});
+  }, []);
+
+  const STATS = [
+    { value: publicStats ? fmt(publicStats.datasets) : "…", label: "Datasets disponibles", icon: Database },
+    { value: publicStats ? `${publicStats.categories}` : "…", label: "Catégories thématiques", icon: BarChart3 },
+    { value: publicStats ? fmt(publicStats.price_observations) : "…", label: "Relevés de prix", icon: Users },
+    { value: "100%", label: "Open source", icon: Globe },
+  ];
+
   return (
     <div className="min-h-screen bg-white">
 

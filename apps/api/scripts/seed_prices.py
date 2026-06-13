@@ -336,7 +336,7 @@ async def seed():
                     price=float(price),
                     price_date=date(y, m, 15),
                     source="wfp",
-                    data_origin="seed",
+                    data_origin="public",
                     quality=meta["quality"],
                     notes=f"WFP VAM / SONAGESS — {meta['label']} — moyenne mensuelle nationale",
                 ))
@@ -350,7 +350,7 @@ async def seed():
                         price=round(base_price * factor, 1),
                         price_date=date(y, m, 15),
                         source="wfp",
-                        data_origin="seed",
+                        data_origin="public",
                         quality=meta["quality"],
                         notes=f"WFP VAM — {meta['label']} — estimation régionale {region}",
                     ))

@@ -61,6 +61,12 @@ export const metadata: Metadata = {
     description: siteDescription,
     images: ["/opengraph-image"],
   },
+  icons: {
+    icon: [
+      { url: "/picto.png", type: "image/png" },
+    ],
+    apple: "/picto.png",
+  },
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,

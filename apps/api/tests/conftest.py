@@ -55,6 +55,7 @@ async def db_session(test_engine):
         await session.execute(text("DELETE FROM program_scenarios"))
         await session.execute(text("DELETE FROM program_price_alerts"))
         await session.execute(text("DELETE FROM programs"))
+        await session.execute(text("DELETE FROM page_views"))
         await session.execute(text("DELETE FROM dashboard_preferences"))
         await session.execute(text("DELETE FROM alert_rules"))
         await session.execute(text("DELETE FROM import_jobs"))

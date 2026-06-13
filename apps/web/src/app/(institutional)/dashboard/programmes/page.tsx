@@ -521,8 +521,8 @@ export default function ProgrammesPage() {
           <div className="space-y-1.5">
             <div className="flex gap-1 mb-1">
               <div className="w-8" />
-              {MONTHS_SHORT.map((m) => (
-                <div key={m} className="flex-1 text-center text-[9px] text-gray-400 font-medium">{m}</div>
+              {MONTHS_SHORT.map((m, index) => (
+                <div key={`month-${index}`} className="flex-1 text-center text-[9px] text-gray-400 font-medium">{m}</div>
               ))}
             </div>
             {heatmapRows.map((row) => (

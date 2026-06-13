@@ -5,20 +5,24 @@ import { usePathname } from "next/navigation";
 import {
   Users, Globe, Database, TrendingUp, Shield,
   FileText, Settings, LogOut, ChevronRight, Mail,
+  BookOpen, BarChart3,
 } from "lucide-react";
 import { AuthGate } from "@/components/auth/AuthGate";
 import { useAuth } from "@/hooks/useAuth";
+import { PRIVATE_LOCALE_HELP, PRIVATE_LOCALE_LABEL } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
   { href: "/admin/utilisateurs", icon: Users,      label: "Utilisateurs" },
   { href: "/admin/organisations", icon: Globe,     label: "Organisations" },
   { href: "/admin/datasets",      icon: Database,  label: "Datasets" },
+  { href: "/admin/visites",       icon: BarChart3, label: "Visites" },
   { href: "/admin/prix",          icon: TrendingUp,label: "SMS Prix" },
   { href: "/admin/alertes-email", icon: Mail,      label: "Alertes email" },
   { href: "/admin/supervision",   icon: TrendingUp,label: "Supervision" },
   { href: "/admin/securite",      icon: Shield,    label: "Sécurité" },
   { href: "/admin/logs",          icon: FileText,  label: "Journaux" },
+  { href: "/guide",               icon: BookOpen,  label: "Guide" },
   { href: "/admin/parametres",    icon: Settings,  label: "Réglages" },
 ];
 
@@ -130,6 +134,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
 
           {/* Avatar */}
+          <div
+            className="hidden sm:flex items-center rounded-lg border border-gray-100 bg-gray-50 px-2.5 py-1.5 text-[11px] font-semibold text-gray-500 shrink-0"
+            title={PRIVATE_LOCALE_HELP}
+          >
+            {PRIVATE_LOCALE_LABEL}
+          </div>
+
           <div className="w-8 h-8 rounded-full bg-[#E04E2F] flex items-center justify-center text-white text-xs font-bold shrink-0">
             {initials}
           </div>

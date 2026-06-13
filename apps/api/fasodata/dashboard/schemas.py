@@ -206,10 +206,15 @@ class DashboardPreferenceUpdate(DashboardPreferenceBase):
     pass
 
 
+class DashboardGuideStateUpdate(BaseModel):
+    guide_dismissed: bool
+
+
 class DashboardPreferenceOut(DashboardPreferenceBase):
     id: uuid.UUID
     user_id: uuid.UUID
     is_configured: bool
+    guide_dismissed: bool = False
     created_at: datetime
     updated_at: datetime
 

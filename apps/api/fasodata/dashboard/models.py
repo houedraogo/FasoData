@@ -62,6 +62,7 @@ class DashboardPreference(Base):
     data_types: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
     regions: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
     is_configured: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    guide_dismissed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 

@@ -29,6 +29,7 @@ from fasodata.dashboard.schemas import (
     AlertRuleOut,
     AlertRuleUpdate,
     DashboardOverviewOut,
+    DashboardGuideStateUpdate,
     DashboardPreferenceOut,
     DashboardPreferenceUpdate,
     DashboardRegionSummaryOut,
@@ -460,6 +461,18 @@ async def upsert_dashboard_preferences(
     else:
         preference = DashboardPreference(user_id=current_user.id, is_configured=True, **values)
         db.add(preference)
+    await db.flush()
+    return preference
+
+
+@router.patch("/preferences/guide", response_model=DashboardPreferenceOut)
+async def update_dashboard_guide_state(
+    data: DashboardGuideStateUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    preference = await _get_or_create_dashboard_preferences(db, current_user)
+    preference.guide_dismissed = data.guide_dismissed
     await db.flush()
     return preference
 

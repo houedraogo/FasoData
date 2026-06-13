@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { ChevronRight, Code2, Database, Info, Mail, Map, Menu, X } from "lucide-react";
+import { BookOpen, ChevronRight, Code2, Database, Info, Mail, Map, Menu, X } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage, type Locale } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -12,6 +12,7 @@ const navLinks = [
   { href: "/datasets", labelKey: "nav.datasets", icon: Database },
   { href: "/carte", labelKey: "nav.map", icon: Map },
   { href: "/carte-prix", labelKey: "nav.priceMap", icon: Map },
+  { href: "/guide", labelKey: "nav.guide", icon: BookOpen },
   { href: "/developers", labelKey: "nav.api", icon: Code2 },
   { href: "/a-propos", labelKey: "nav.about", icon: Info },
   { href: "/contact", labelKey: "nav.contact", icon: Mail },

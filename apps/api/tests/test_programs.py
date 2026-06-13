@@ -111,6 +111,7 @@ class TestProgramsApi:
         assert data["data_types"] == ["time_series", "maps"]
         assert data["regions"] == ["National"]
         assert data["is_configured"] is False
+        assert data["guide_dismissed"] is False
 
         update = await client.put(
             "/api/dashboard/preferences",
@@ -128,12 +129,36 @@ class TestProgramsApi:
         assert updated["data_types"] == ["alerts", "datasets"]
         assert updated["regions"] == ["Sahel", "Centre"]
         assert updated["is_configured"] is True
+        assert updated["guide_dismissed"] is False
 
         reread = await client.get(
             "/api/dashboard/preferences",
             headers=auth_headers(institutional_token),
         )
         assert reread.json()["domains"] == ["prices", "health"]
+
+    async def test_dashboard_guide_state_can_be_dismissed_without_configuring_preferences(
+        self,
+        client,
+        institutional_token,
+    ):
+        update = await client.patch(
+            "/api/dashboard/preferences/guide",
+            json={"guide_dismissed": True},
+            headers=auth_headers(institutional_token),
+        )
+        assert update.status_code == 200, update.text
+        data = update.json()
+        assert data["guide_dismissed"] is True
+        assert data["is_configured"] is False
+
+        restore = await client.patch(
+            "/api/dashboard/preferences/guide",
+            json={"guide_dismissed": False},
+            headers=auth_headers(institutional_token),
+        )
+        assert restore.status_code == 200, restore.text
+        assert restore.json()["guide_dismissed"] is False
 
     async def test_dashboard_preferences_require_minimum_choices(
         self,

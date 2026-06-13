@@ -17,6 +17,7 @@ import fasodata.datasets.models  # noqa
 import fasodata.prices.models  # noqa
 import fasodata.alerts.models  # noqa
 import fasodata.dashboard.models  # noqa
+import fasodata.analytics.models  # noqa
 
 target_metadata = Base.metadata
 

@@ -123,6 +123,7 @@ export default function AdminDashboardPage() {
             {[
               { href: "/admin/utilisateurs", label: "Gérer les utilisateurs", color: "text-blue-600 bg-blue-50" },
               { href: "/admin/datasets", label: "Modérer les datasets", color: "text-green-600 bg-green-50" },
+              { href: "/admin/visites", label: "Statistiques des visites", color: "text-orange-600 bg-orange-50" },
               { href: "/admin/organisations", label: "Organisations", color: "text-cyan-600 bg-cyan-50" },
               { href: "/admin/supervision", label: "Supervision technique", color: "text-purple-600 bg-purple-50" },
               { href: "/admin/parametres", label: "Paramètres système", color: "text-gray-600 bg-gray-50" },

@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Database, TrendingUp, Map, FileText,
   Bell, Users, Settings, LogOut, Search, ChevronRight,
-  ShieldCheck, X, Menu,
+  ShieldCheck, X, Menu, BookOpen,
 } from "lucide-react";
 import { AuthGate } from "@/components/auth/AuthGate";
 import { useAuth } from "@/hooks/useAuth";
@@ -24,6 +24,7 @@ const NAV_ITEMS = [
   { href: "/dashboard/rapports",   icon: FileText,        label: "Rapports" },
   { href: "/dashboard/alertes",    icon: Bell,            label: "Alertes", badge: 3 },
   { href: "/dashboard/equipe",     icon: Users,           label: "Équipe" },
+  { href: "/guide",                icon: BookOpen,        label: "Guide" },
   { href: "/dashboard/profil",     icon: Settings,        label: "Paramètres" },
 ];
 

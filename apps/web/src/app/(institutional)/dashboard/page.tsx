@@ -13,7 +13,7 @@ import {
   Download, Plus, AlertTriangle, Info, CheckCircle,
   FileText, TrendingUp, TrendingDown, X, ChevronDown,
   Database, Map as MapIcon, ShieldCheck, HeartPulse,
-  Wheat, ClipboardCheck, Bell, Settings2, BarChart3,
+  Wheat, ClipboardCheck, Bell, Settings2, BarChart3, BookOpen,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/lib/api";
@@ -205,6 +205,7 @@ type DashboardPreferencesApi = {
   data_types: string[];
   regions: string[];
   is_configured: boolean;
+  guide_dismissed?: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -384,6 +385,22 @@ export default function DashboardPage() {
   });
 
   // ── Programmes depuis l'API ──────────────────────────────────────────────────
+  const guideStateMutation = useMutation({
+    mutationFn: async (guideDismissed: boolean) => {
+      const { data } = await api.patch("/dashboard/preferences/guide", {
+        guide_dismissed: guideDismissed,
+      });
+      return data as DashboardPreferencesApi;
+    },
+    onSuccess: (saved) => {
+      queryClient.setQueryData(["dashboard-preferences"], saved);
+      toast.success(saved.guide_dismissed ? "Parcours masque" : "Parcours reactif");
+    },
+    onError: () => {
+      toast.error("Impossible de mettre a jour le parcours");
+    },
+  });
+
   const { data: programmesData = [], refetch: refetchPrograms } = useQuery<Programme[]>({
     queryKey: ["dashboard-programs"],
     queryFn: async () => {
@@ -426,6 +443,39 @@ export default function DashboardPage() {
     .filter((type) => activePreferences.dataTypes.includes(type.id))
     .map((type) => type.label);
   const displayedRecommendations = recommendationData ?? [];
+  const guideSteps = [
+    {
+      title: "Configurer vos preferences",
+      text: "Choisir les domaines, formats et regions qui orientent la veille.",
+      done: Boolean(preferenceRecord?.is_configured),
+      href: "/dashboard/profil",
+      action: "Modifier",
+    },
+    {
+      title: "Explorer les donnees utiles",
+      text: "Parcourir le catalogue, la carte et les prix recommandes.",
+      done: displayedRecommendations.length > 0 || (publishedDatasets?.items?.length ?? 0) > 0,
+      href: "/datasets",
+      action: "Explorer",
+    },
+    {
+      title: "Creer une regle d'alerte",
+      text: "Recevoir un signal lorsqu'un seuil important est depasse.",
+      done: alertRules.length > 0,
+      href: "/dashboard/alertes",
+      action: "Configurer",
+    },
+    {
+      title: "Creer un programme",
+      text: "Ajouter vos indicateurs terrain au suivi du dashboard.",
+      done: hasPrograms,
+      href: "#programme",
+      action: "Creer",
+    },
+  ];
+  const guideDoneCount = guideSteps.filter((step) => step.done).length;
+  const guideProgress = Math.round((guideDoneCount / guideSteps.length) * 100);
+  const showGuideChecklist = !preferenceRecord?.guide_dismissed;
 
   // Formulaire nouveau programme
   const [prog, setProg] = useState({
@@ -696,6 +746,98 @@ export default function DashboardPage() {
           </button>
         </div>
       </div>
+
+      {showGuideChecklist && (
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-5">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#1A2C42]/10 text-[#1A2C42] flex items-center justify-center shrink-0">
+              <BookOpen className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="font-bold text-gray-900">Parcours de demarrage</h2>
+                <span className="text-[10px] font-semibold text-[#E04E2F] bg-[#E04E2F]/10 px-2 py-1 rounded-full">
+                  {guideDoneCount}/{guideSteps.length}
+                </span>
+              </div>
+              <p className="text-sm text-gray-500 mt-1">
+                Suivez ces etapes pour passer de la decouverte des donnees au pilotage de vos programmes.
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+            <Link
+              href="/guide"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 px-3.5 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+            >
+              Lire le guide complet
+              <BookOpen className="w-4 h-4" />
+            </Link>
+            <button
+              type="button"
+              onClick={() => guideStateMutation.mutate(true)}
+              disabled={guideStateMutation.isPending}
+              className="inline-flex items-center justify-center rounded-xl px-3.5 py-2 text-sm font-semibold text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+            >
+              Reprendre plus tard
+            </button>
+          </div>
+        </div>
+
+        <div className="h-2 bg-gray-100 rounded-full overflow-hidden mb-4">
+          <div className="h-full bg-[#16A34A] rounded-full transition-all" style={{ width: `${guideProgress}%` }} />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+          {guideSteps.map((step) => {
+            const content = (
+              <>
+                <div className={cn(
+                  "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
+                  step.done ? "bg-green-50 text-[#16A34A]" : "bg-gray-100 text-gray-400"
+                )}>
+                  {step.done ? <CheckCircle className="w-4 h-4" /> : <span className="w-2 h-2 rounded-full bg-current" />}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-gray-900">{step.title}</p>
+                  <p className="text-xs text-gray-500 mt-1 leading-relaxed">{step.text}</p>
+                  <span className={cn(
+                    "inline-flex mt-3 text-xs font-semibold",
+                    step.done ? "text-[#16A34A]" : "text-[#E04E2F]"
+                  )}>
+                    {step.done ? "Termine" : step.action}
+                  </span>
+                </div>
+              </>
+            );
+
+            if (step.href === "#programme") {
+              return (
+                <button
+                  key={step.title}
+                  type="button"
+                  onClick={() => setShowNouveauProg(true)}
+                  className="text-left flex gap-3 rounded-xl border border-gray-100 p-4 hover:border-[#1A2C42]/20 hover:bg-gray-50/60 transition-colors"
+                >
+                  {content}
+                </button>
+              );
+            }
+
+            return (
+              <Link
+                key={step.title}
+                href={step.href}
+                className="flex gap-3 rounded-xl border border-gray-100 p-4 hover:border-[#1A2C42]/20 hover:bg-gray-50/60 transition-colors"
+              >
+                {content}
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+      )}
 
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1068,6 +1210,7 @@ export default function DashboardPage() {
               [
                 { title: "Créer une règle d’alerte", text: "Recevoir un signal sur un seuil prix, météo ou dataset.", href: "/dashboard/alertes", icon: Bell },
                 { title: "Explorer le catalogue", text: "Trouver les datasets publics correspondant à votre veille.", href: "/datasets", icon: Database },
+                { title: "Lire le guide", text: "Comprendre les parcours catalogue, carte, prix, programmes et rapports.", href: "/guide", icon: BookOpen },
                 { title: "Créer un programme", text: "Ajouter vos indicateurs terrain au dashboard.", href: "#programme", icon: Plus },
               ].map((action) => {
                 const Icon = action.icon;

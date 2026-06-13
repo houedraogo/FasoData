@@ -3,6 +3,7 @@
 export const dynamic = "force-dynamic";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowRight,
@@ -220,6 +221,10 @@ function OnboardingContent() {
 
       <p className="text-xs text-gray-400 mt-6 text-center">
         Vous pourrez modifier vos preferences a tout moment depuis votre profil.
+        <br />
+        <Link href="/guide" className="font-semibold text-[#E04E2F] hover:underline">
+          Consulter le guide d'utilisation
+        </Link>
       </p>
     </div>
   );

@@ -19,6 +19,39 @@ const categoryMeta = [
 export default function HomePage() {
   const { locale, t } = useLanguage();
 
+  const showcase =
+    locale === "fr"
+      ? {
+          eyebrow: "Apercu de la plateforme",
+          title: "Une interface claire pour passer des donnees a la decision",
+          subtitle:
+            "FasoData rassemble catalogue public, suivi des prix, cartes regionales et indicateurs d'impact dans un meme espace.",
+          dashboard: "Tableau de bord ONG",
+          dashboardSubtitle: "KPIs, alertes et suivi programme",
+          map: "Carte interactive",
+          mapSubtitle: "Prix alimentaires par region",
+          catalog: "Catalogue public",
+          catalogSubtitle: "Datasets fiables et exportables",
+          published: "publie",
+          verified: "verifie",
+          api: "API",
+        }
+      : {
+          eyebrow: "Platform preview",
+          title: "A clear interface from data to decisions",
+          subtitle:
+            "FasoData brings the public catalog, food price monitoring, regional maps and impact indicators into one workspace.",
+          dashboard: "NGO dashboard",
+          dashboardSubtitle: "KPIs, alerts and program tracking",
+          map: "Interactive map",
+          mapSubtitle: "Food prices by region",
+          catalog: "Public catalog",
+          catalogSubtitle: "Reliable datasets and exports",
+          published: "published",
+          verified: "verified",
+          api: "API",
+        };
+
   const stats = [
     { value: "1 200+", label: t("home.stats.datasets") },
     { value: "45", label: t("home.stats.categories") },
@@ -67,12 +100,9 @@ export default function HomePage() {
       <Navbar />
 
       <section className="relative bg-faso-navy overflow-hidden">
-        <div className="absolute inset-0">
-          <div className="absolute top-0 left-1/4 w-96 h-96 bg-faso-red/10 rounded-full blur-3xl" />
-          <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-faso-gold/10 rounded-full blur-3xl" />
-        </div>
+        <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.06)_0,rgba(255,255,255,0)_38%),radial-gradient(circle_at_top_right,rgba(239,75,43,0.18),transparent_38%)]" />
 
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 lg:py-32">
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
           <div className="max-w-3xl">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/10 rounded-full text-white/80 text-sm mb-6">
               <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
@@ -107,6 +137,126 @@ export default function HomePage() {
           <svg viewBox="0 0 1440 60" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M0 60L1440 60L1440 0C1200 40 960 60 720 45C480 30 240 10 0 30L0 60Z" fill="#F9FAFB" />
           </svg>
+        </div>
+      </section>
+
+      <section className="bg-gray-50 py-14 border-b border-gray-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid gap-10 lg:grid-cols-[0.82fr_1.18fr] lg:items-center">
+            <div>
+              <p className="text-sm font-bold uppercase tracking-[0.16em] text-faso-red mb-3">{showcase.eyebrow}</p>
+              <h2 className="text-3xl lg:text-4xl font-bold text-faso-navy leading-tight mb-4">{showcase.title}</h2>
+              <p className="text-gray-600 leading-relaxed max-w-xl">{showcase.subtitle}</p>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-[1.16fr_0.84fr]">
+              <div className="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+                <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 rounded-full bg-faso-red" />
+                    <span className="h-2.5 w-2.5 rounded-full bg-faso-gold" />
+                    <span className="h-2.5 w-2.5 rounded-full bg-green-500" />
+                  </div>
+                  <span className="text-xs font-semibold text-gray-400">dashboard.fasodata.com</span>
+                </div>
+
+                <div className="p-5">
+                  <div className="mb-5 flex items-start justify-between gap-4">
+                    <div>
+                      <h3 className="font-bold text-faso-navy">{showcase.dashboard}</h3>
+                      <p className="text-xs text-gray-500 mt-1">{showcase.dashboardSubtitle}</p>
+                    </div>
+                    <span className="rounded-full bg-green-50 px-3 py-1 text-xs font-bold text-green-700">Live</span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3 mb-5">
+                    {[
+                      ["1 200+", "Datasets"],
+                      ["3 026", "Prix"],
+                      ["13", "Regions"],
+                    ].map(([value, label]) => (
+                      <div key={label} className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                        <div className="text-xl font-black text-faso-navy">{value}</div>
+                        <div className="text-[11px] font-semibold uppercase text-gray-400">{label}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="h-44 rounded-xl border border-gray-100 bg-white px-4 py-3">
+                    <div className="flex items-center gap-2 mb-4">
+                      <BarChart3 className="h-4 w-4 text-faso-red" />
+                      <span className="text-xs font-bold text-gray-600">Prix du mil par region</span>
+                    </div>
+                    <div className="flex h-28 items-end gap-3">
+                      {[58, 76, 48, 86, 64, 72, 54, 92, 69].map((height, index) => (
+                        <div key={index} className="flex flex-1 flex-col items-center gap-2">
+                          <div
+                            className="w-full rounded-t-md bg-faso-red"
+                            style={{ height: `${height}%`, minHeight: 22 }}
+                          />
+                          <span className="h-1.5 w-1.5 rounded-full bg-gray-300" />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-4">
+                <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                  <div className="mb-4 flex items-center justify-between">
+                    <div>
+                      <h3 className="font-bold text-faso-navy">{showcase.map}</h3>
+                      <p className="text-xs text-gray-500">{showcase.mapSubtitle}</p>
+                    </div>
+                    <Map className="h-5 w-5 text-faso-red" />
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {["Sahel", "Nord", "Est", "Centre", "Boucle", "Sud"].map((region, index) => (
+                      <div
+                        key={region}
+                        className={`rounded-lg border p-3 text-xs font-bold ${
+                          index % 3 === 0
+                            ? "border-red-200 bg-red-50 text-red-700"
+                            : index % 3 === 1
+                              ? "border-amber-200 bg-amber-50 text-amber-700"
+                              : "border-green-200 bg-green-50 text-green-700"
+                        }`}
+                      >
+                        {region}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-4 flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-500">
+                    <span>Mil local</span>
+                    <span className="font-bold text-faso-navy">438 FCFA/kg</span>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                  <div className="mb-4 flex items-center justify-between">
+                    <div>
+                      <h3 className="font-bold text-faso-navy">{showcase.catalog}</h3>
+                      <p className="text-xs text-gray-500">{showcase.catalogSubtitle}</p>
+                    </div>
+                    <Database className="h-5 w-5 text-faso-red" />
+                  </div>
+                  {[
+                    ["Prix cereales Burkina", showcase.published],
+                    ["Limites administratives", showcase.verified],
+                    ["Indicateurs sante", showcase.api],
+                  ].map(([name, status]) => (
+                    <div key={name} className="flex items-center justify-between border-t border-gray-100 py-2 first:border-t-0">
+                      <span className="truncate text-sm font-semibold text-gray-700">{name}</span>
+                      <span className="ml-3 rounded-full bg-gray-100 px-2 py-1 text-[11px] font-bold uppercase text-gray-500">
+                        {status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 

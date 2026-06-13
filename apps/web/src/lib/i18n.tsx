@@ -9,13 +9,23 @@ type TranslationDictionary = Record<string, TranslationValue>;
 
 const STORAGE_KEY = "fasodata.locale";
 
-// Scope actuel: navigation publique, footer et page d'accueil.
+export const I18N_SCOPE = {
+  public: true,
+  private: false,
+} as const;
+
+export const PRIVATE_LOCALE_LABEL = "FR";
+export const PRIVATE_LOCALE_HELP =
+  "L'espace prive FasoData est disponible en francais pour cette version.";
+
+// Scope v1: navigation publique, footer et page d'accueil.
 // Les espaces dashboard/admin restent en francais tant que leur dictionnaire complet n'est pas couvert.
 const dictionaries: Record<Locale, TranslationDictionary> = {
   fr: {
     "nav.datasets": "Explorer les donnees",
     "nav.map": "Carte interactive",
     "nav.priceMap": "Carte des prix",
+    "nav.guide": "Guide",
     "nav.api": "API",
     "nav.about": "A propos",
     "nav.contact": "Contact",
@@ -28,6 +38,7 @@ const dictionaries: Record<Locale, TranslationDictionary> = {
     "footer.platform": "Plateforme",
     "footer.explore": "Explorer",
     "footer.publicApi": "API publique",
+    "footer.guide": "Guide d'utilisation",
     "footer.statistics": "Statistiques",
     "footer.organization": "Organisation",
     "footer.partners": "Partenaires",
@@ -100,6 +111,7 @@ const dictionaries: Record<Locale, TranslationDictionary> = {
     "nav.datasets": "Explore data",
     "nav.map": "Interactive map",
     "nav.priceMap": "Price map",
+    "nav.guide": "Guide",
     "nav.api": "API",
     "nav.about": "About",
     "nav.contact": "Contact",
@@ -112,6 +124,7 @@ const dictionaries: Record<Locale, TranslationDictionary> = {
     "footer.platform": "Platform",
     "footer.explore": "Explore",
     "footer.publicApi": "Public API",
+    "footer.guide": "User guide",
     "footer.statistics": "Statistics",
     "footer.organization": "Organization",
     "footer.partners": "Partners",

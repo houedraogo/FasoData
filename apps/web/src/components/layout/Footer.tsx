@@ -29,6 +29,7 @@ export function Footer() {
               {[
                 [t("footer.explore"), "/datasets"],
                 [t("nav.map"), "/carte"],
+                [t("footer.guide"), "/guide"],
                 [t("footer.publicApi"), "/developers"],
                 [t("footer.statistics"), "/tableau-de-bord"],
               ].map(([label, href]) => (
@@ -65,7 +66,7 @@ export function Footer() {
               {[
                 [t("nav.signUp"), "/auth/inscription"],
                 [t("footer.publish"), "/dashboard/import"],
-                [t("footer.docs"), "/developers"],
+                [t("footer.docs"), "/guide"],
               ].map(([label, href]) => (
                 <li key={href}>
                   <Link href={href} className="text-white/60 hover:text-white text-sm transition-colors">

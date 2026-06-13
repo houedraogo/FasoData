@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 
+from fasodata.analytics.router import router as analytics_router
 from fasodata.auth.router import router as auth_router
 from fasodata.core.config import get_settings
 from fasodata.datasets.router import router as datasets_router
@@ -84,6 +85,7 @@ Instrumentator().instrument(app).expose(app, endpoint="/api/metrics")
 
 # Routers
 app.include_router(auth_router)
+app.include_router(analytics_router)
 app.include_router(users_router)
 app.include_router(datasets_router)
 app.include_router(dashboard_router)

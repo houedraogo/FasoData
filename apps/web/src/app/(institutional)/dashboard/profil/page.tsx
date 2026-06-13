@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -10,7 +11,7 @@ import {
   CheckCircle, Loader2, Shield, Calendar, Camera,
   MessageSquare, TrendingUp, BarChart3, AlertTriangle,
   Upload, X, Settings2, Wheat, HeartPulse, ClipboardCheck,
-  Droplets, Map, Database, Bell,
+  Droplets, Map, Database, Bell, BookOpen, ArrowRight,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
@@ -51,6 +52,7 @@ type DashboardPreferencesApi = {
   data_types: string[];
   regions: string[];
   is_configured: boolean;
+  guide_dismissed?: boolean;
 };
 
 const DEFAULT_PREFERENCES: DashboardPreferences = {
@@ -195,6 +197,21 @@ export default function ProfilPage() {
       toast.success("Préférences du dashboard mises à jour");
     },
     onError: () => toast.error("Impossible d’enregistrer les préférences"),
+  });
+
+  const guideStateMutation = useMutation({
+    mutationFn: async (guideDismissed: boolean) => {
+      const { data } = await api.patch("/dashboard/preferences/guide", {
+        guide_dismissed: guideDismissed,
+      });
+      return data as DashboardPreferencesApi;
+    },
+    onSuccess: (saved) => {
+      queryClient.setQueryData(["dashboard-preferences"], saved);
+      queryClient.invalidateQueries({ queryKey: ["dashboard-overview"] });
+      toast.success(saved.guide_dismissed ? "Parcours masque" : "Parcours reactive");
+    },
+    onError: () => toast.error("Impossible de mettre a jour le parcours"),
   });
 
   const handleSavePreferences = () => {
@@ -391,6 +408,36 @@ export default function ProfilPage() {
           </div>
         ))}
       </div>
+
+      <SectionCard title="Aide & guide" icon={BookOpen}>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-gray-900">Comprendre le fonctionnement de FasoData</p>
+            <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+              Retrouvez les parcours par profil, l'utilisation du catalogue, de la carte, des prix, des programmes et des rapports.
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+            <Link
+              href="/guide"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#1A2C42] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#223A57] transition-colors"
+            >
+              Ouvrir le guide
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+            {preferenceRecord?.guide_dismissed && (
+              <button
+                type="button"
+                onClick={() => guideStateMutation.mutate(false)}
+                disabled={guideStateMutation.isPending}
+                className="inline-flex items-center justify-center rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Afficher le parcours
+              </button>
+            )}
+          </div>
+        </div>
+      </SectionCard>
 
       {/* ── Historique des relevés SMS ── */}
       <SectionCard title="Mes relevés de prix" icon={MessageSquare}>

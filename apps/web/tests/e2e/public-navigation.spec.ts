@@ -5,6 +5,7 @@ const PUBLIC_ROUTES = [
   { path: "/datasets", text: "Explorer les données" },
   { path: "/carte", text: "Carte" },
   { path: "/carte-prix", text: "prix" },
+  { path: "/guide", text: "Guide" },
   { path: "/developers", text: "API" },
   { path: "/auth/connexion", text: "Connexion" },
 ];

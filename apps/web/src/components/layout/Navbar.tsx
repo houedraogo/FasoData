@@ -26,7 +26,7 @@ function LanguageToggle({ compact = false }: { compact?: boolean }) {
   return (
     <div
       className={cn(
-        "inline-flex items-center rounded-full border border-white/15 bg-white/10 p-1",
+        "inline-flex items-center rounded-full border border-gray-200 bg-gray-100 p-1",
         compact && "w-full justify-center"
       )}
       role="group"
@@ -39,7 +39,7 @@ function LanguageToggle({ compact = false }: { compact?: boolean }) {
           onClick={() => setLocale(item)}
           className={cn(
             "min-w-9 rounded-full px-2.5 py-1 text-xs font-bold uppercase transition-colors",
-            locale === item ? "bg-white text-faso-navy shadow-sm" : "text-white/60 hover:text-white"
+            locale === item ? "bg-white text-[#1A2C42] shadow-sm" : "text-gray-400 hover:text-gray-700"
           )}
           aria-pressed={locale === item}
         >
@@ -57,7 +57,7 @@ export function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <nav className="sticky top-0 z-50 bg-faso-navy/95 backdrop-blur-md border-b border-white/10 shadow-lg">
+    <nav className="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <Link href="/" className="flex items-center group">
@@ -79,8 +79,8 @@ export function Navbar() {
                 className={cn(
                   "px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200",
                   pathname === href || pathname.startsWith(href + "/")
-                    ? "bg-white/15 text-white"
-                    : "text-white/70 hover:text-white hover:bg-white/10"
+                    ? "bg-[#1A2C42]/8 text-[#1A2C42] font-semibold"
+                    : "text-gray-500 hover:text-[#1A2C42] hover:bg-gray-100"
                 )}
               >
                 {t(labelKey)}
@@ -94,7 +94,7 @@ export function Navbar() {
               <>
                 <Link
                   href={user.role === "admin" ? "/admin" : "/dashboard"}
-                  className="text-sm text-white/70 hover:text-white transition-colors"
+                  className="text-sm text-gray-500 hover:text-[#1A2C42] transition-colors"
                 >
                   {user.full_name || user.email}
                 </Link>
@@ -109,7 +109,7 @@ export function Navbar() {
               <>
                 <Link
                   href="/auth/connexion"
-                  className="text-sm text-white/70 hover:text-white transition-colors"
+                  className="text-sm text-gray-500 hover:text-[#1A2C42] transition-colors"
                 >
                   {t("nav.signIn")}
                 </Link>
@@ -122,7 +122,7 @@ export function Navbar() {
 
           <button
             type="button"
-            className="lg:hidden text-white/80 hover:text-white"
+            className="lg:hidden text-gray-500 hover:text-[#1A2C42]"
             onClick={() => setMenuOpen(!menuOpen)}
             aria-label={menuOpen ? "Close menu" : "Open menu"}
             aria-expanded={menuOpen}
@@ -132,24 +132,24 @@ export function Navbar() {
         </div>
 
         {menuOpen && (
-          <div className="lg:hidden py-4 border-t border-white/10 space-y-1">
+          <div className="lg:hidden py-4 border-t border-gray-100 space-y-1">
             {navLinks.map(({ href, labelKey, icon: Icon }) => (
               <Link
                 key={href}
                 href={href}
-                className="flex items-center gap-3 px-4 py-3 text-white/80 hover:text-white hover:bg-white/10 rounded-xl transition-all"
+                className="flex items-center gap-3 px-4 py-3 text-gray-600 hover:text-[#1A2C42] hover:bg-gray-50 rounded-xl transition-all"
                 onClick={() => setMenuOpen(false)}
               >
                 <Icon className="w-4 h-4" />
                 {t(labelKey)}
               </Link>
             ))}
-            <div className="pt-3 border-t border-white/10 space-y-2">
+            <div className="pt-3 border-t border-gray-100 space-y-2">
               <LanguageToggle compact />
               {user ? (
                 <Link
                   href="/dashboard"
-                  className="flex items-center justify-center gap-2 w-full py-2.5 bg-faso-red text-white font-semibold rounded-xl"
+                  className="flex items-center justify-center gap-2 w-full py-2.5 bg-[#E04E2F] text-white font-semibold rounded-xl"
                   onClick={() => setMenuOpen(false)}
                 >
                   {t("nav.workspace")}
@@ -158,14 +158,14 @@ export function Navbar() {
                 <>
                   <Link
                     href="/auth/connexion"
-                    className="block text-center py-2.5 text-white/80 hover:text-white"
+                    className="block text-center py-2.5 text-gray-600 hover:text-[#1A2C42]"
                     onClick={() => setMenuOpen(false)}
                   >
                     {t("nav.signIn")}
                   </Link>
                   <Link
                     href="/auth/inscription"
-                    className="flex items-center justify-center gap-2 w-full py-2.5 bg-faso-red text-white font-semibold rounded-xl"
+                    className="flex items-center justify-center gap-2 w-full py-2.5 bg-[#E04E2F] text-white font-semibold rounded-xl"
                     onClick={() => setMenuOpen(false)}
                   >
                     {t("nav.signUp")}

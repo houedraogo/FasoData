@@ -137,8 +137,9 @@ function ConnexionInner() {
         <div className="absolute right-0 top-0 bottom-0 w-1 bg-gradient-to-b from-[#F5A623] via-[#E04E2F] to-[#F5A623]" />
 
         {/* Logo */}
-        <div className="px-10 pt-10">
-          <Image src="/logo.png" alt="FasoData" width={160} height={50} className="h-11 w-auto brightness-0 invert" priority />
+        <div className="px-10 pt-10 flex items-center gap-3">
+          <Image src="/picto.png" alt="" width={40} height={40} className="w-10 h-10 rounded-xl object-cover shrink-0" priority />
+          <span className="text-white font-bold text-xl tracking-tight">FasoData</span>
         </div>
 
         {/* Quote centrale */}

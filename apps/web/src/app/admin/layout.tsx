@@ -48,9 +48,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <aside className="hidden w-[200px] bg-[#1A2C42] lg:flex flex-col fixed inset-y-0 left-0 z-30 shrink-0">
 
         {/* Logo */}
-        <div className="px-5 pt-6 pb-5">
-          <Link href="/" className="flex items-center">
-            <Image src="/logo.png" alt="FasoData" width={130} height={40} className="h-8 w-auto brightness-0 invert" priority />
+        <div className="px-4 pt-6 pb-5">
+          <Link href="/" className="flex items-center gap-2.5 group">
+            <Image src="/picto.png" alt="" width={32} height={32} className="w-8 h-8 rounded-lg object-cover shrink-0" priority />
+            <span className="text-white font-bold text-base tracking-tight group-hover:opacity-90 transition-opacity">FasoData</span>
           </Link>
         </div>
 

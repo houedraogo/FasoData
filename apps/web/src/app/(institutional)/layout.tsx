@@ -87,9 +87,10 @@ export default function InstitutionalLayout({ children }: { children: React.Reac
       <aside className="hidden lg:flex w-[200px] bg-[#1A2C42] flex-col fixed inset-y-0 left-0 z-30 shrink-0">
 
         {/* Logo */}
-        <div className="px-5 pt-6 pb-5">
-          <Link href="/" className="flex items-center">
-            <Image src="/logo.png" alt="FasoData" width={130} height={40} className="h-8 w-auto brightness-0 invert" priority />
+        <div className="px-4 pt-6 pb-5">
+          <Link href="/" className="flex items-center gap-2.5 group">
+            <Image src="/picto.png" alt="" width={32} height={32} className="w-8 h-8 rounded-lg object-cover shrink-0" priority />
+            <span className="text-white font-bold text-base tracking-tight group-hover:opacity-90 transition-opacity">FasoData</span>
           </Link>
         </div>
 
@@ -156,8 +157,9 @@ export default function InstitutionalLayout({ children }: { children: React.Reac
           <aside className="relative w-72 max-w-[85vw] bg-[#1A2C42] flex flex-col h-full shadow-2xl">
             {/* Header drawer */}
             <div className="flex items-center justify-between px-5 pt-6 pb-5">
-              <Link href="/" onClick={() => setDrawerOpen(false)} className="flex items-center">
-                <Image src="/logo.png" alt="FasoData" width={120} height={36} className="h-8 w-auto brightness-0 invert" />
+              <Link href="/" onClick={() => setDrawerOpen(false)} className="flex items-center gap-2.5">
+                <Image src="/picto.png" alt="" width={32} height={32} className="w-8 h-8 rounded-lg object-cover shrink-0" />
+                <span className="text-white font-bold text-base">FasoData</span>
               </Link>
               <button onClick={() => setDrawerOpen(false)}
                 className="w-8 h-8 flex items-center justify-center text-white/40 hover:text-white rounded-lg">

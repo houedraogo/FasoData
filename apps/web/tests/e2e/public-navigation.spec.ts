@@ -25,7 +25,7 @@ test.describe("navigation publique", () => {
 
   test("la documentation developers lit OpenAPI", async ({ page }) => {
     await page.goto("/developers");
-    await expect(page.getByRole("heading", { name: "Reference endpoints" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Référence endpoints" })).toBeVisible();
     await expect(page.locator("tbody tr")).not.toHaveCount(0);
     await expect(page.locator("body")).not.toContainText("OpenAPI indisponible");
   });

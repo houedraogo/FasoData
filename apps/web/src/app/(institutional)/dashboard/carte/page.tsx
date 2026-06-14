@@ -36,7 +36,23 @@ const LEGEND = [
   { label: "> 115% du seuil",  color: "#DC2626" },
 ];
 
-interface LatestPrice { id: string; commodity: string; region: string; price: number; }
+interface LatestPrice {
+  id: string;
+  commodity: string;
+  region: string;
+  price: number;
+  price_date?: string;
+  n_obs?: number;
+  source?: string;
+  reporter?: string | null;
+}
+
+function formatPriceDate(value?: string | null) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
+}
 
 export default function DashboardCartePage() {
   const [commodity, setCommodity]     = useState("sorghum");
@@ -49,8 +65,8 @@ export default function DashboardCartePage() {
     queryKey: ["carte-dashboard-prices", commodity],
     queryFn: async () => {
       const results = await Promise.allSettled(
-        ALL_REGIONS.map((region) =>
-          api.get(`/prices/latest?region=${encodeURIComponent(region)}`)
+        ["National", ...ALL_REGIONS].map((region) =>
+          api.get(`/prices/latest?region=${encodeURIComponent(region)}&sources=wfp`)
             .then(({ data }) => data as LatestPrice[])
             .catch(() => [] as LatestPrice[])
         )
@@ -65,8 +81,16 @@ export default function DashboardCartePage() {
   const regionPrices = useMemo(() => {
     if (!latestData) return [];
     return latestData
-      .filter((p) => p.commodity === commodity)
-      .map((p) => ({ region: p.region, price: p.price, commodity: p.commodity }));
+      .filter((p) => p.commodity === commodity && ALL_REGIONS.includes(p.region))
+      .map((p) => ({
+        region: p.region,
+        price: p.price,
+        commodity: p.commodity,
+        price_date: p.price_date,
+        n_obs: p.n_obs,
+        source: p.source,
+        reporter: p.reporter,
+      }));
   }, [latestData, commodity]);
 
   const prices       = regionPrices.map((p) => p.price).filter(Boolean);
@@ -77,6 +101,18 @@ export default function DashboardCartePage() {
   const maxRegion    = regionPrices.find((p) => p.price === maxPrice);
   const minRegion    = regionPrices.find((p) => p.price === minPrice);
   const selectedData = selectedRegion ? regionPrices.find((p) => p.region === selectedRegion) : null;
+  const tracePrices = regionPrices.length
+    ? regionPrices
+    : (latestData ?? []).filter((p) => p.commodity === commodity);
+  const latestObservationDate = tracePrices
+    .map((p) => p.price_date)
+    .filter(Boolean)
+    .sort()
+    .at(-1);
+  const totalObservations = tracePrices.reduce((sum, p) => sum + (p.n_obs ?? 0), 0);
+  const sourceTrace = latestObservationDate
+    ? `HDX/WFP · ${formatPriceDate(latestObservationDate)} · ${totalObservations || tracePrices.length} obs.`
+    : "HDX/WFP · date indisponible · 0 obs.";
 
   return (
     <div className="p-3 sm:p-6 lg:p-8 h-full">
@@ -86,7 +122,7 @@ export default function DashboardCartePage() {
         <div className="min-w-0">
           <h1 className="text-lg sm:text-2xl font-bold text-gray-900">Cartographie des prix</h1>
           <p className="text-gray-500 text-xs sm:text-sm mt-0.5 hidden sm:block">
-            Données WFP / SONAGESS · Burkina Faso · 13 régions
+            Source publique {sourceTrace} · Burkina Faso · 13 régions
           </p>
         </div>
         <button onClick={() => refetch()}
@@ -194,6 +230,9 @@ export default function DashboardCartePage() {
                       ? `Seuil dépassé de ${Math.round(((selectedData.price - activeCommodity.seuil) / activeCommodity.seuil) * 100)}%`
                       : `${Math.round(((activeCommodity.seuil - selectedData.price) / activeCommodity.seuil) * 100)}% sous le seuil`}
                   </p>
+                  <p className="mt-2 text-[10px] text-white/45">
+                    HDX/WFP · {formatPriceDate(selectedData.price_date) ?? "date indisponible"} · {selectedData.n_obs ?? 1} obs.
+                  </p>
                 </>
               ) : (
                 <p className="text-white/50 text-sm">Pas de données</p>
@@ -258,7 +297,7 @@ export default function DashboardCartePage() {
           </div>
 
           <p className="text-[10px] text-gray-400 text-right">
-            Source : WFP VAM / SONAGESS Burkina Faso · Carte approximative
+            Source : {sourceTrace} · Carte approximative
           </p>
         </div>
       </div>

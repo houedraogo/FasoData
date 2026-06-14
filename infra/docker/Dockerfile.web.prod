@@ -12,7 +12,9 @@ COPY apps/web/ .
 
 # Variables next.js build-time (remplacées par les vraies valeurs au runtime)
 ARG NEXT_PUBLIC_API_URL=https://fasodata.hamed-vps.cloud/api
+ARG NEXT_PUBLIC_GOOGLE_CLIENT_ID=
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_GOOGLE_CLIENT_ID=$NEXT_PUBLIC_GOOGLE_CLIENT_ID
 
 # Build Next.js en mode production
 ENV NODE_ENV=production

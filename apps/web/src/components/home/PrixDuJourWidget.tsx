@@ -22,6 +22,10 @@ interface LatestPrice {
   price:      number;
   price_date: string;
   unit:       string;
+  source?:    string;
+  data_origin?: string;
+  reporter?:  string | null;
+  n_obs?:     number;
 }
 
 interface PriceSeries {
@@ -33,7 +37,7 @@ interface PriceSeries {
 
 const COMMODITIES = [
   { key: "sorghum",    label: "Sorgho",    emoji: "🌾", seuil: 320, color: "#E04E2F" },
-  { key: "rice_imported", label: "Riz importé", emoji: "🍚", seuil: 500, color: "#1A2C42" },
+  { key: "rice_local",    label: "Riz local",   emoji: "🍚", seuil: 500, color: "#1A2C42" },
   { key: "maize",      label: "Maïs",      emoji: "🌽", seuil: 300, color: "#16A34A" },
   { key: "millet",     label: "Mil",       emoji: "🌿", seuil: 350, color: "#D97706" },
   { key: "cowpea",     label: "Niébé",     emoji: "🫘", seuil: 650, color: "#8B5CF6" },
@@ -75,7 +79,7 @@ export default function PrixDuJourWidget() {
     setError(false);
     try {
       // Appel via le proxy Nginx /api → FastAPI (fonctionne en dev ET prod)
-      const resp = await fetch(`${window.location.origin}/api/prices/latest?region=National`, {
+      const resp = await fetch(`${window.location.origin}/api/prices/latest?region=National&sources=wfp`, {
         cache: "no-store",
       });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -87,6 +91,7 @@ export default function PrixDuJourWidget() {
             region: "National",
             granularity: "monthly",
             start: "2022-01",
+            sources: "wfp",
           });
           const seriesResp = await fetch(`${window.location.origin}/api/prices/series?${params}`, {
             cache: "no-store",
@@ -203,6 +208,10 @@ export default function PrixDuJourWidget() {
             const { pct, up, flat } = getTrend(c.key, price);
             const aboveSeuil = price > c.seuil;
             const hist       = sparklines[c.key] ?? [];
+            const observationCount = p?.n_obs ? `${p.n_obs} obs.` : "source WFP";
+            const priceDate = p?.price_date
+              ? new Date(p.price_date).toLocaleDateString("fr-FR", { month: "short", year: "numeric" })
+              : null;
 
             return (
               <Link key={c.key} href="/carte-prix"
@@ -259,6 +268,9 @@ export default function PrixDuJourWidget() {
                       <p className="text-[10px] text-gray-400 mt-1">
                         Seuil : {c.seuil} CFA/kg
                         {aboveSeuil && <span className="text-[#E04E2F] font-semibold ml-1">⚠️ dépassé</span>}
+                      </p>
+                      <p className="mt-1 truncate text-[10px] font-medium text-gray-400">
+                        {p ? `HDX/WFP · ${priceDate} · ${observationCount}` : "HDX/WFP indisponible"}
                       </p>
                     </div>
                   </>

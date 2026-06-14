@@ -31,6 +31,7 @@ class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
+    is_new: bool = False
 
 
 class RefreshRequest(BaseModel):
@@ -116,6 +117,74 @@ class ResetPasswordRequest(BaseModel):
 
 class MessageResponse(BaseModel):
     message: str
+
+
+# ── Google SSO ────────────────────────────────────────────────────────────────
+
+class GoogleTokenRequest(BaseModel):
+    credential: str  # JWT signé par Google (id_token)
+
+
+@router.post("/google", response_model=TokenResponse)
+async def google_auth(data: GoogleTokenRequest, db: AsyncSession = Depends(get_db)):
+    """
+    Vérifie le credential Google (id_token) via l'API tokeninfo de Google,
+    puis crée ou connecte l'utilisateur correspondant.
+    """
+    import httpx
+
+    if not settings.google_client_id:
+        raise HTTPException(status_code=501, detail="Google SSO non configuré sur ce serveur.")
+
+    # ── Vérification du token auprès de Google ────────────────────────────────
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.get(
+            "https://oauth2.googleapis.com/tokeninfo",
+            params={"id_token": data.credential},
+        )
+
+    if resp.status_code != 200:
+        raise HTTPException(status_code=401, detail="Token Google invalide.")
+
+    info = resp.json()
+
+    # Vérifier que le token a bien été émis pour notre application
+    if info.get("aud") != settings.google_client_id:
+        raise HTTPException(status_code=401, detail="Token Google non destiné à cette application.")
+
+    email     = info.get("email", "").lower().strip()
+    full_name = info.get("name") or info.get("email", "").split("@")[0]
+
+    if not email:
+        raise HTTPException(status_code=400, detail="Email non fourni par Google.")
+
+    # ── Recherche ou création de l'utilisateur ────────────────────────────────
+    result = await db.execute(select(User).where(User.email == email))
+    user   = result.scalar_one_or_none()
+
+    is_new = False
+    if user:
+        if not user.is_active:
+            raise HTTPException(status_code=400, detail="Compte désactivé.")
+    else:
+        import secrets
+        user = User(
+            email=email,
+            hashed_password=hash_password(secrets.token_urlsafe(32)),
+            full_name=full_name,
+            role="public",
+            is_active=True,
+        )
+        db.add(user)
+        await db.flush()
+        is_new = True
+        logger.info(f"Nouvel utilisateur via Google SSO : {email}")
+
+    return TokenResponse(
+        access_token=create_access_token(str(user.id), {"role": user.role}),
+        refresh_token=create_refresh_token(str(user.id)),
+        is_new=is_new,
+    )
 
 
 @router.post("/forgot-password", response_model=MessageResponse)

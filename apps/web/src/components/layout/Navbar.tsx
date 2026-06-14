@@ -3,8 +3,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
-import { BookOpen, ChevronRight, Code2, Database, Info, Mail, Map, Menu, X } from "lucide-react";
+import { useRef, useState } from "react";
+import { BookOpen, ChevronRight, Code2, Database, Info, LogOut, Mail, Map, Menu, User, X } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage, type Locale } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -52,9 +52,11 @@ function LanguageToggle({ compact = false }: { compact?: boolean }) {
 
 export function Navbar() {
   const pathname = usePathname();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { t } = useLanguage();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
   return (
     <nav className="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm">
@@ -91,20 +93,59 @@ export function Navbar() {
           <div className="hidden lg:flex items-center gap-3">
             <LanguageToggle />
             {user ? (
-              <>
-                <Link
-                  href={user.role === "admin" ? "/admin" : "/dashboard"}
-                  className="text-sm text-gray-500 hover:text-[#1A2C42] transition-colors"
+              <div className="relative" ref={userMenuRef}>
+                <button
+                  onClick={() => setUserMenuOpen(!userMenuOpen)}
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm text-gray-600 hover:text-[#1A2C42] hover:bg-gray-100 transition-colors"
                 >
-                  {user.full_name || user.email}
-                </Link>
-                <Link
-                  href={user.role === "admin" ? "/admin" : "/dashboard"}
-                  className="btn-primary text-sm py-2"
-                >
-                  {t("nav.workspace")} <ChevronRight className="w-4 h-4" />
-                </Link>
-              </>
+                  <div className="w-7 h-7 rounded-full bg-[#1A2C42] flex items-center justify-center text-white text-xs font-bold shrink-0">
+                    {(user.full_name || user.email).charAt(0).toUpperCase()}
+                  </div>
+                  <span className="max-w-[140px] truncate">{user.full_name || user.email}</span>
+                  <ChevronRight className={cn("w-4 h-4 transition-transform", userMenuOpen && "rotate-90")} />
+                </button>
+
+                {userMenuOpen && (
+                  <div className="absolute right-0 mt-1 w-52 bg-white border border-gray-100 rounded-xl shadow-lg py-1 z-50">
+                    {user.role === "public" ? (
+                      <>
+                        <Link
+                          href="/mon-espace"
+                          onClick={() => setUserMenuOpen(false)}
+                          className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+                        >
+                          <User className="w-4 h-4 text-gray-400" />
+                          {t("nav.mySpace")}
+                        </Link>
+                        <Link
+                          href="/dashboard/profil"
+                          onClick={() => setUserMenuOpen(false)}
+                          className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+                        >
+                          <User className="w-4 h-4 text-gray-400" />
+                          {t("nav.myProfile")}
+                        </Link>
+                      </>
+                    ) : (
+                      <Link
+                        href={user.role === "admin" ? "/admin" : "/dashboard"}
+                        onClick={() => setUserMenuOpen(false)}
+                        className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+                      >
+                        <User className="w-4 h-4 text-gray-400" />
+                        {t("nav.workspace")}
+                      </Link>
+                    )}
+                    <button
+                      onClick={() => { setUserMenuOpen(false); logout(); }}
+                      className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-red-600 hover:bg-red-50"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      {t("nav.signOut")}
+                    </button>
+                  </div>
+                )}
+              </div>
             ) : (
               <>
                 <Link
@@ -147,13 +188,42 @@ export function Navbar() {
             <div className="pt-3 border-t border-gray-100 space-y-2">
               <LanguageToggle compact />
               {user ? (
-                <Link
-                  href="/dashboard"
-                  className="flex items-center justify-center gap-2 w-full py-2.5 bg-[#E04E2F] text-white font-semibold rounded-xl"
-                  onClick={() => setMenuOpen(false)}
-                >
-                  {t("nav.workspace")}
-                </Link>
+                <>
+                  {user.role === "public" ? (
+                    <>
+                      <Link
+                        href="/mon-espace"
+                        className="flex items-center justify-center gap-2 w-full py-2.5 bg-[#1A2C42] text-white font-semibold rounded-xl"
+                        onClick={() => setMenuOpen(false)}
+                      >
+                        {t("nav.mySpace")}
+                      </Link>
+                      <Link
+                        href="/dashboard/profil"
+                        className="flex items-center justify-center gap-2 w-full py-2.5 border border-[#1A2C42] text-[#1A2C42] font-semibold rounded-xl"
+                        onClick={() => setMenuOpen(false)}
+                      >
+                        <User className="w-4 h-4" />
+                        {t("nav.myProfile")}
+                      </Link>
+                    </>
+                  ) : (
+                    <Link
+                      href={user.role === "admin" ? "/admin" : "/dashboard"}
+                      className="flex items-center justify-center gap-2 w-full py-2.5 bg-[#E04E2F] text-white font-semibold rounded-xl"
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      {t("nav.workspace")}
+                    </Link>
+                  )}
+                  <button
+                    onClick={() => { setMenuOpen(false); logout(); }}
+                    className="flex items-center justify-center gap-2 w-full py-2.5 text-red-600 border border-red-200 rounded-xl text-sm font-medium hover:bg-red-50"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    {t("nav.signOut")}
+                  </button>
+                </>
               ) : (
                 <>
                   <Link

@@ -54,13 +54,30 @@ const COUNTRY_CFG: Record<string, { name: string; flag: string; color: string }>
 
 type Tab = "carte" | "comparaison";
 
-interface LatestPrice { id: string; commodity: string; region: string; price: number; price_date: string; unit: string; }
+interface LatestPrice {
+  id: string;
+  commodity: string;
+  region: string;
+  price: number;
+  price_date: string;
+  unit: string;
+  source?: string;
+  reporter?: string | null;
+  n_obs?: number;
+}
 interface CountryPrice { country: string; name: string; color: string; price: number | null; price_date: string | null; unit: string; }
 interface CompareData {
   commodity: string; commodity_label: string; region: string;
   current_prices: CountryPrice[];
   series: ({ year: number; BFA?: number; MLI?: number; NER?: number })[];
   stats: { most_expensive: CountryPrice | null; cheapest: CountryPrice | null; spread_pct: number; countries_count: number };
+}
+
+function formatPriceDate(value?: string | null) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 // ── Page ─────────────────────────────────────────────────────────────────────
@@ -78,8 +95,8 @@ export default function CartePrixPage() {
     queryKey: ["carte-prix-bfa", commodity],
     queryFn: async () => {
       const results = await Promise.allSettled(
-        ALL_REGIONS.map((region) =>
-          api.get(`/prices/latest?region=${encodeURIComponent(region)}&country=BFA`)
+        ["National", ...ALL_REGIONS].map((region) =>
+          api.get(`/prices/latest?region=${encodeURIComponent(region)}&country=BFA&sources=wfp`)
             .then(({ data }) => data as LatestPrice[])
             .catch(() => [] as LatestPrice[])
         )
@@ -94,8 +111,16 @@ export default function CartePrixPage() {
 
   const regionPrices = useMemo(() => {
     if (!latestData) return [];
-    return latestData.filter((p) => p.commodity === commodity)
-      .map((p) => ({ region: p.region, price: p.price, commodity: p.commodity }));
+    return latestData.filter((p) => p.commodity === commodity && ALL_REGIONS.includes(p.region))
+      .map((p) => ({
+        region: p.region,
+        price: p.price,
+        commodity: p.commodity,
+        price_date: p.price_date,
+        n_obs: p.n_obs,
+        source: p.source,
+        reporter: p.reporter,
+      }));
   }, [latestData, commodity]);
 
   const prices     = regionPrices.map((p) => p.price).filter((v) => v > 0);
@@ -107,6 +132,18 @@ export default function CartePrixPage() {
   const minRegion  = regionPrices.find((p) => p.price === minPrice);
   const selectedData = selectedRegion ? regionPrices.find((p) => p.region === selectedRegion) : null;
   const mapHasNoData = !loadingMap && regionPrices.length === 0;
+  const tracePrices = regionPrices.length
+    ? regionPrices
+    : (latestData ?? []).filter((p) => p.commodity === commodity);
+  const latestObservationDate = tracePrices
+    .map((p) => p.price_date)
+    .filter(Boolean)
+    .sort()
+    .at(-1);
+  const totalObservations = tracePrices.reduce((sum, p) => sum + (p.n_obs ?? 0), 0);
+  const sourceTrace = latestObservationDate
+    ? `HDX/WFP · ${formatPriceDate(latestObservationDate)} · ${totalObservations || tracePrices.length} obs.`
+    : "HDX/WFP · date indisponible · 0 obs.";
 
   // ── Onglet Comparaison ───────────────────────────────────────────────────
 
@@ -245,6 +282,9 @@ export default function CartePrixPage() {
                           ? `Seuil dépassé de ${Math.round(((selectedData.price - activeCommodity.seuil) / activeCommodity.seuil) * 100)}%`
                           : `${Math.round(((activeCommodity.seuil - selectedData.price) / activeCommodity.seuil) * 100)}% sous le seuil`}
                       </p>
+                      <p className="mt-2 text-[10px] text-white/45">
+                        HDX/WFP · {formatPriceDate(selectedData.price_date) ?? "date indisponible"} · {selectedData.n_obs ?? 1} obs.
+                      </p>
                     </>
                   ) : <p className="text-sm text-white/50 mt-2">Pas de données</p>}
                   <button onClick={() => setSelectedRegion(null)} className="mt-3 text-[10px] text-white/40 hover:text-white/70">✕ Désélectionner</button>
@@ -326,7 +366,7 @@ export default function CartePrixPage() {
                 </div>
               )}
               <div className="absolute bottom-6 left-6 text-[10px] text-gray-400 bg-white/80 px-2 py-1 rounded-lg backdrop-blur-sm">
-                Source publique HDX/WFP · Burkina Faso
+                Source publique {sourceTrace} · Burkina Faso
               </div>
             </div>
           </div>

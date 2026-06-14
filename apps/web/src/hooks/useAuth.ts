@@ -64,6 +64,12 @@ export const useAuth = create<AuthStore>((set) => ({
   },
 
   logout: () => {
+    // Révoquer la session Google pour éviter la reconnexion automatique
+    if (typeof window !== "undefined" && window.google?.accounts?.id) {
+      const email = useAuth.getState().user?.email;
+      window.google.accounts.id.disableAutoSelect();
+      if (email) window.google.accounts.id.revoke(email, () => {});
+    }
     clearAuthTokens();
     set({ user: null, status: "anonymous", isLoading: false });
     window.location.assign("/");

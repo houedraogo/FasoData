@@ -26,7 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from fasodata.auth.deps import get_current_active_user, require_admin, require_institutional
 from fasodata.core.config import get_settings
-from fasodata.core.data_origin import visible_origin_filter
+from fasodata.core.data_origin import NON_PRODUCTION_ORIGINS, visible_origin_filter
 from fasodata.core.database import get_db
 from fasodata.prices import at_service
 from fasodata.prices.at_service import build_confirmation, build_rejection
@@ -119,7 +119,9 @@ def _parse_series_sources(value: str | None) -> list[str]:
 
 def _visible_price_filters() -> list:
     origin_filter = visible_origin_filter(PriceData.data_origin, settings)
-    return [origin_filter] if origin_filter is not None else []
+    if origin_filter is not None:
+        return [origin_filter]
+    return [PriceData.data_origin.notin_(NON_PRODUCTION_ORIGINS)]
 
 
 # ── Endpoints ──────────────────────────────────────────────────────────────
@@ -142,19 +144,22 @@ async def list_commodities(db: AsyncSession = Depends(get_db)):
 async def latest_prices(
     region:  str = "National",
     country: str = "BFA",
+    sources: str | None = Query(None, description="Sources separees par virgule: wfp,sms,aggregated"),
     db: AsyncSession = Depends(get_db),
 ):
     """Dernier prix de chaque produit pour une région et un pays."""
+    selected_sources = _parse_series_sources(sources) if sources else None
+    source_filters = [PriceData.source.in_(selected_sources)] if selected_sources else []
     subq = (
         select(PriceData.commodity, func.max(PriceData.price_date).label("max_date"))
-        .where(PriceData.region == region, PriceData.country == country, *_visible_price_filters())
+        .where(PriceData.region == region, PriceData.country == country, *_visible_price_filters(), *source_filters)
         .group_by(PriceData.commodity)
         .subquery()
     )
     result = await db.execute(
         select(PriceData)
         .join(subq, (PriceData.commodity == subq.c.commodity) & (PriceData.price_date == subq.c.max_date))
-        .where(PriceData.region == region, PriceData.country == country, *_visible_price_filters())
+        .where(PriceData.region == region, PriceData.country == country, *_visible_price_filters(), *source_filters)
         .order_by(PriceData.commodity)
     )
     rows = result.scalars().all()

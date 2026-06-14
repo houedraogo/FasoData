@@ -104,14 +104,15 @@ function OnboardingContent() {
 
   const saveAndRedirect = async (themeIds: ThemeId[], successMessage: string) => {
     setSaving(true);
+    const destination = routeForRole(user?.role);
     try {
       await api.put("/dashboard/preferences", buildPreferences(themeIds));
       toast.success(successMessage);
-      router.replace(routeForRole(user?.role));
     } catch {
-      toast.error("Impossible d'enregistrer vos preferences");
+      // Préférences non sauvegardées mais on redirige quand même
     } finally {
       setSaving(false);
+      router.replace(destination);
     }
   };
 

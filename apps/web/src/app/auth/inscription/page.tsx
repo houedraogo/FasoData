@@ -3,20 +3,21 @@
 export const dynamic = "force-dynamic";
 
 import Image from "next/image";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
-  Eye, EyeOff, Database, Loader2, Building2, User,
+  Eye, EyeOff, Loader2, Building2, User,
   CheckCircle2, ShieldCheck, Users,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import toast from "react-hot-toast";
 import { cn } from "@/lib/utils";
+import { GoogleButton } from "@/components/auth/GoogleButton";
 
 // ── Schéma de validation ────────────────────────────────────────────────────
 
@@ -92,7 +93,7 @@ function PasswordStrength({ password }: { password: string }) {
 
 // ── Page principale ──────────────────────────────────────────────────────────
 
-export default function InscriptionPage() {
+function InscriptionInner() {
   const router = useRouter();
   const { login } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
@@ -147,11 +148,13 @@ export default function InscriptionPage() {
 
         <div className="relative text-center space-y-8 max-w-sm">
           {/* Logo */}
-          <div className="flex items-center justify-center">
-            <Image src="/logo.png" alt="FasoData" width={200} height={62} className="h-14 w-auto brightness-0 invert" priority />
-            <div className="text-left hidden">
-              <div className="text-3xl font-bold text-white">FasoData</div>
-              <div className="text-white/60 text-sm">Burkina Faso Open Data</div>
+          <div className="flex items-center justify-center gap-3">
+            <div className="w-12 h-12 bg-faso-red rounded-xl flex items-center justify-center shadow-lg shrink-0">
+              <Image src="/picto.png" alt="FasoData" width={32} height={32} className="w-8 h-8 object-contain" priority />
+            </div>
+            <div className="text-left">
+              <div className="text-2xl font-bold text-white">FasoData</div>
+              <div className="text-white/60 text-xs">Burkina Faso Open Data</div>
             </div>
           </div>
 
@@ -188,18 +191,30 @@ export default function InscriptionPage() {
 
           {/* Logo mobile */}
           <div className="lg:hidden flex items-center gap-2 mb-8">
-            <Link href="/" className="flex items-center">
-              <Image src="/logo.png" alt="FasoData" width={140} height={44} className="h-10 w-auto" />
+            <Link href="/" className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-faso-navy rounded-lg flex items-center justify-center">
+                <Image src="/picto.png" alt="FasoData" width={24} height={24} className="w-5 h-5 object-contain" />
+              </div>
+              <span className="font-bold text-faso-navy text-lg">Faso<span className="font-light text-faso-red">Data</span></span>
             </Link>
           </div>
 
           <h1 className="text-2xl font-bold text-faso-navy mb-1">Créer un compte</h1>
-          <p className="text-gray-500 text-sm mb-8">
+          <p className="text-gray-500 text-sm mb-6">
             Déjà inscrit ?{" "}
             <Link href="/auth/connexion" className="text-faso-red font-medium hover:underline">
               Se connecter
             </Link>
           </p>
+
+          {/* SSO Google */}
+          <GoogleButton />
+
+          <div className="flex items-center gap-3 my-5">
+            <div className="flex-1 h-px bg-gray-200" />
+            <span className="text-xs text-gray-400 font-medium">OU</span>
+            <div className="flex-1 h-px bg-gray-200" />
+          </div>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
 
@@ -384,5 +399,13 @@ export default function InscriptionPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function InscriptionPage() {
+  return (
+    <Suspense>
+      <InscriptionInner />
+    </Suspense>
   );
 }

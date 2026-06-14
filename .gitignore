@@ -54,6 +54,9 @@ logs/
 # Tests
 .coverage
 htmlcov/
+apps/web/playwright-report/
+apps/web/test-results/
+*.tsbuildinfo
 
 # Docker volumes
 db_data/

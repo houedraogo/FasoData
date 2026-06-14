@@ -154,11 +154,19 @@ async def public_stats(db: AsyncSession = Depends(get_db)):
     price_result = await db.execute(price_q)
     total_prices = price_result.scalar_one()
 
+    org_result = await db.execute(
+        select(func.count(func.distinct(User.organization))).where(
+            User.organization.is_not(None), User.organization != ""
+        )
+    )
+    total_organizations = org_result.scalar_one()
+
     return {
         "datasets": total_datasets,
         "categories": total_categories,
         "downloads": int(total_downloads),
         "price_observations": total_prices,
+        "organizations": total_organizations,
     }
 
 
@@ -169,6 +177,7 @@ async def list_datasets(
     q: str | None = None,
     category: str | None = None,
     status: DatasetStatus | None = DatasetStatus.published,
+    sort: str = Query("recent", regex="^(recent|popular|downloads|name)$"),
     db: AsyncSession = Depends(get_db),
 ):
     await ensure_public_price_dataset(db)
@@ -183,7 +192,13 @@ async def list_datasets(
     total_result = await db.execute(select(func.count()).select_from(query.subquery()))
     total = total_result.scalar_one()
 
-    query = query.order_by(Dataset.created_at.desc())
+    _sort = {
+        "recent":    Dataset.created_at.desc(),
+        "popular":   Dataset.view_count.desc(),
+        "downloads": Dataset.download_count.desc(),
+        "name":      Dataset.name.asc(),
+    }
+    query = query.order_by(_sort.get(sort, Dataset.created_at.desc()))
     query = query.offset((page - 1) * page_size).limit(page_size)
     result = await db.execute(query)
     items = result.scalars().all()
@@ -516,12 +531,27 @@ async def download_dataset(slug: str, db: AsyncSession = Depends(get_db)):
                 secret_key=settings.minio_secret_key,
                 secure=settings.minio_secure,
             )
-            url = client.presigned_get_object(
-                settings.minio_bucket,
-                dataset.s3_key,
-                expires=timedelta(minutes=30),
-            )
-            return {"download_url": url, "filename": dataset.s3_key.split("/")[-1]}
+            filename = dataset.s3_key.split("/")[-1]
+            if settings.minio_public_url:
+                # Générer URL signée et remplacer l'host interne
+                url = client.presigned_get_object(
+                    settings.minio_bucket,
+                    dataset.s3_key,
+                    expires=timedelta(minutes=30),
+                )
+                internal = f"{'https' if settings.minio_secure else 'http'}://{settings.minio_endpoint}"
+                url = url.replace(internal, settings.minio_public_url.rstrip("/"))
+                return {"download_url": url, "filename": filename}
+            else:
+                # Pas d'URL publique MinIO : streamer le fichier directement via l'API
+                from fastapi.responses import StreamingResponse as SR
+                obj = client.get_object(settings.minio_bucket, dataset.s3_key)
+                content_type = "text/csv; charset=utf-8" if filename.endswith(".csv") else "application/octet-stream"
+                return SR(
+                    obj,
+                    media_type=content_type,
+                    headers={"Content-Disposition": f"attachment; filename={filename}"},
+                )
         except Exception:
             pass
 

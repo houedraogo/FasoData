@@ -18,7 +18,7 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from fasodata.auth.deps import require_admin
+from fasodata.auth.deps import get_current_active_user, require_admin
 from fasodata.core.config import get_settings
 from fasodata.core.database import get_db
 from fasodata.alerts.models import AlertSubscription
@@ -183,6 +183,22 @@ async def alert_status(db: AsyncSession = Depends(get_db)):
         "whatsapp_mode":        "WhatsApp Cloud API" if whatsapp_ok else "Simulation (logs)",
         "check_schedule":       "8h00 · 14h00 · 20h00 WAT",
     }
+
+
+# ── Utilisateur connecté ────────────────────────────────────────────────────────
+
+@router.get("/me", response_model=list[SubscribeOut])
+async def my_subscriptions(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Abonnements alertes de l'utilisateur connecté (par email)."""
+    result = await db.execute(
+        select(AlertSubscription)
+        .where(AlertSubscription.email == current_user.email)
+        .order_by(AlertSubscription.created_at.desc())
+    )
+    return [SubscribeOut.model_validate(r) for r in result.scalars().all()]
 
 
 # ── Admin ──────────────────────────────────────────────────────────────────────

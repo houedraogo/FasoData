@@ -3,10 +3,11 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { Search, Download, Eye, Database, Tag, AlertTriangle, RefreshCw, XCircle } from "lucide-react";
+import { Search, Download, Eye, Database, Tag, AlertTriangle, RefreshCw, XCircle, ArrowUpDown } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatBytes, formatDate, formatNumber } from "@/lib/utils";
 import { DataOriginBadge } from "@/components/ui/DataOriginBadge";
+import { useLanguage } from "@/lib/i18n";
 
 const categories = ["Agriculture", "Santé", "Éducation", "Économie", "Géographie", "Environnement", "Sécurité", "Social"];
 
@@ -29,17 +30,20 @@ type Dataset = {
 };
 
 export default function DatasetsPage() {
+  const { t } = useLanguage();
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("");
+  const [sort, setSort] = useState("recent");
   const [page, setPage] = useState(1);
 
   const { data, isLoading, isError, isFetching, refetch } = useQuery({
-    queryKey: ["datasets", search, category, page],
+    queryKey: ["datasets", search, category, sort, page],
     queryFn: async () => {
       const params = new URLSearchParams({
         page: String(page),
         page_size: "12",
         status: "published",
+        sort,
         ...(search && { q: search }),
         ...(category && { category }),
       });
@@ -53,18 +57,18 @@ export default function DatasetsPage() {
       {/* Header */}
       <div className="bg-faso-navy py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h1 className="text-3xl font-bold text-white mb-2">Explorer les données</h1>
+          <h1 className="text-3xl font-bold text-white mb-2">{t("datasets.title")}</h1>
           <p className="text-white/70">
-            {isError ? "Catalogue momentanément indisponible" : data?.total ? formatNumber(data.total) : "—"} jeux de données disponibles
+            {isError ? t("datasets.catalogueUnavailable") : data?.total ? formatNumber(data.total) : "—"} {t("datasets.available")}
           </p>
 
           {/* Barre de recherche */}
-          <div className="mt-6 flex gap-3 max-w-2xl">
-            <div className="relative flex-1">
+          <div className="mt-6 flex flex-wrap gap-3 max-w-3xl">
+            <div className="relative flex-1 min-w-48">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input
                 type="text"
-                placeholder="Rechercher des données..."
+                placeholder={t("datasets.searchPlaceholder")}
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setPage(1); }}
                 className="w-full pl-11 pr-4 py-3 bg-white rounded-xl border-0 text-sm focus:outline-none focus:ring-2 focus:ring-faso-red/30 shadow-sm"
@@ -75,10 +79,20 @@ export default function DatasetsPage() {
               onChange={(e) => { setCategory(e.target.value); setPage(1); }}
               className="px-4 py-3 bg-white rounded-xl border-0 text-sm focus:outline-none focus:ring-2 focus:ring-faso-red/30 shadow-sm text-gray-700"
             >
-              <option value="">Toutes les catégories</option>
+              <option value="">{t("datasets.allCategories")}</option>
               {categories.map((c) => (
                 <option key={c} value={c.toLowerCase()}>{c}</option>
               ))}
+            </select>
+            <select
+              value={sort}
+              onChange={(e) => { setSort(e.target.value); setPage(1); }}
+              className="px-4 py-3 bg-white rounded-xl border-0 text-sm focus:outline-none focus:ring-2 focus:ring-faso-red/30 shadow-sm text-gray-700"
+            >
+              <option value="recent">{t("datasets.sortRecent")}</option>
+              <option value="popular">{t("datasets.sortPopular")}</option>
+              <option value="downloads">{t("datasets.sortDownloads")}</option>
+              <option value="name">{t("datasets.sortName")}</option>
             </select>
           </div>
         </div>
@@ -98,22 +112,22 @@ export default function DatasetsPage() {
         ) : isError ? (
           <div className="card p-10 text-center">
             <AlertTriangle className="w-12 h-12 text-amber-300 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-700">Impossible de charger le catalogue</h3>
-            <p className="text-gray-400 mt-2 text-sm">Le service des datasets ne répond pas pour le moment.</p>
+            <h3 className="text-lg font-semibold text-gray-700">{t("datasets.loadError")}</h3>
+            <p className="text-gray-400 mt-2 text-sm">{t("datasets.loadErrorDesc")}</p>
             <button
               onClick={() => refetch()}
               className="mt-5 inline-flex items-center gap-2 rounded-xl bg-faso-navy px-4 py-2 text-sm font-semibold text-white hover:bg-faso-navy/90"
             >
               <RefreshCw className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`} />
-              Réessayer
+              {t("datasets.retry")}
             </button>
           </div>
         ) : data?.items?.length === 0 ? (
           <div className="text-center py-20">
             <Database className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-500">Aucun dataset vérifié trouvé</h3>
+            <h3 className="text-lg font-semibold text-gray-500">{t("datasets.noResults")}</h3>
             <p className="text-gray-400 mt-2">
-              {search || category ? "Essayez d'autres filtres de recherche." : "Le catalogue public ne contient pas encore de dataset vérifié publié."}
+              {search || category ? t("datasets.noResultsFilter") : t("datasets.noResultsEmpty")}
             </p>
             {(search || category) && (
               <button
@@ -121,7 +135,7 @@ export default function DatasetsPage() {
                 className="mt-5 inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
               >
                 <XCircle className="w-4 h-4" />
-                Réinitialiser les filtres
+                {t("datasets.resetFilters")}
               </button>
             )}
           </div>
@@ -141,17 +155,17 @@ export default function DatasetsPage() {
                   disabled={page === 1}
                   className="btn-secondary disabled:opacity-40 disabled:cursor-not-allowed px-4 py-2 text-sm"
                 >
-                  Précédent
+                  {t("datasets.prev")}
                 </button>
                 <span className="text-sm text-gray-500 px-4">
-                  Page {page} / {Math.ceil(data.total / 12)}
+                  {t("datasets.page")} {page} / {Math.ceil(data.total / 12)}
                 </span>
                 <button
                   onClick={() => setPage(page + 1)}
                   disabled={page * 12 >= data.total}
                   className="btn-secondary disabled:opacity-40 disabled:cursor-not-allowed px-4 py-2 text-sm"
                 >
-                  Suivant
+                  {t("datasets.next")}
                 </button>
               </div>
             )}
@@ -163,6 +177,7 @@ export default function DatasetsPage() {
 }
 
 function DatasetCard({ dataset }: { dataset: Dataset }) {
+  const { t } = useLanguage();
   const licenseColors: Record<string, string> = {
     open: "bg-green-100 text-green-700",
     "cc-by": "bg-blue-100 text-blue-700",
@@ -203,7 +218,7 @@ function DatasetCard({ dataset }: { dataset: Dataset }) {
         {dataset.row_count && (
           <span className="flex items-center gap-1">
             <Database className="w-3.5 h-3.5" />
-            {formatNumber(dataset.row_count)} lignes
+            {formatNumber(dataset.row_count)} {t("datasets.rows")}
           </span>
         )}
         {dataset.file_size_bytes && (

@@ -28,10 +28,12 @@ services:
       dockerfile: infra/docker/Dockerfile.web.prod
       args:
         NEXT_PUBLIC_API_URL: /api
+        NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
     env_file:
       - ../.env.production
     environment:
       - NODE_ENV=production
+      - API_INTERNAL_URL=http://api:8000/api
     networks:
       - faso
     restart: unless-stopped

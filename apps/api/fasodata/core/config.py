@@ -20,6 +20,7 @@ class Settings(BaseSettings):
 
     # MinIO
     minio_endpoint: str = "minio:9000"
+    minio_public_url: str = ""  # URL publique pour les URLs signées (ex: https://fasodata.bf/storage)
     minio_access_key: str = "fasodata"
     minio_secret_key: str = "changeme_minio"
     minio_bucket: str = "fasodata-uploads"
@@ -37,6 +38,9 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60
     refresh_token_expire_days: int = 7
+
+    # Google OAuth
+    google_client_id: str = ""
 
     # CORS
     cors_origins: str = "http://localhost,http://localhost:3000"

@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 
 type IndicatorKey = "prix_mais" | "ipc" | "datasets" | "marches";
 type PeriodKey = "30j" | "3m" | "12m" | "3a";
+type LayerKey = "markets" | "alerts" | "datasets" | "labels";
 
 interface GeoFeature {
   type: "Feature";
@@ -42,6 +43,10 @@ interface PriceRow {
   market?: string | null;
   price: number;
   price_date?: string;
+  n_obs?: number;
+  source?: string;
+  data_origin?: string;
+  reporter?: string | null;
 }
 
 interface DatasetItem {
@@ -61,6 +66,8 @@ interface RegionMetric {
   capital: string;
   price: number | null;
   priceDate: string | null;
+  priceObs: number | null;
+  priceSource: string | null;
   markets: number;
   datasets: number;
   ipcPhase: number;
@@ -75,11 +82,11 @@ const COMMODITIES = [
   { key: "cowpea", label: "Niebe", threshold: 650 },
 ];
 
-const INDICATORS: Array<{ key: IndicatorKey; label: string; unit: string; range: string[] }> = [
-  { key: "prix_mais", label: "Prix alimentaire", unit: "CFA/kg", range: ["< 70%", "85%", "105%", "> 115%"] },
-  { key: "ipc", label: "Alerte alimentaire", unit: "phase", range: ["1", "2", "3", "4"] },
-  { key: "datasets", label: "Couverture datasets", unit: "datasets", range: ["0", "1", "3", "5+"] },
-  { key: "marches", label: "Marches suivis", unit: "marches", range: ["0", "2", "5", "8+"] },
+const INDICATORS: Array<{ key: IndicatorKey; label: string; unit: string; range: string[]; source: string }> = [
+  { key: "prix_mais", label: "Prix alimentaire", unit: "CFA/kg", range: ["< 70%", "85%", "105%", "> 115%"], source: "HDX/WFP Food Prices" },
+  { key: "ipc", label: "Alerte alimentaire", unit: "phase", range: ["1", "2", "3", "4"], source: "Alertes FasoData" },
+  { key: "datasets", label: "Couverture datasets", unit: "datasets", range: ["0", "1", "3", "5+"], source: "Catalogue public FasoData" },
+  { key: "marches", label: "Marches suivis", unit: "marches", range: ["0", "2", "5", "8+"], source: "Observations prix WFP" },
 ];
 
 const PERIODS: Array<{ key: PeriodKey; label: string; months: number }> = [
@@ -89,7 +96,7 @@ const PERIODS: Array<{ key: PeriodKey; label: string; months: number }> = [
   { key: "3a", label: "3a", months: 36 },
 ];
 
-const INITIAL_LAYERS = [
+const INITIAL_LAYERS: Array<{ key: LayerKey; label: string; enabled: boolean }> = [
   { key: "markets", label: "Marches alimentaires", enabled: true },
   { key: "alerts", label: "Alertes actives", enabled: true },
   { key: "datasets", label: "Datasets geographiques", enabled: true },
@@ -115,11 +122,51 @@ function periodStart(period: PeriodKey) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 
+function formatPriceDate(value?: string | null) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
+}
+
 function metricValue(region: RegionMetric, indicator: IndicatorKey) {
   if (indicator === "prix_mais") return region.price ?? 0;
   if (indicator === "ipc") return region.ipcPhase;
   if (indicator === "datasets") return region.datasets;
   return region.markets;
+}
+
+function indicatorLegend(indicator: IndicatorKey) {
+  if (indicator === "ipc") {
+    return [
+      { label: "Phase 1", color: "#DCFCE7" },
+      { label: "Phase 2", color: "#FDE68A" },
+      { label: "Phase 3", color: "#F97316" },
+      { label: "Phase 4+", color: "#DC2626" },
+    ];
+  }
+  if (indicator === "datasets") {
+    return [
+      { label: "0", color: "#E5E7EB" },
+      { label: "1-2", color: "#93C5FD" },
+      { label: "3-4", color: "#2563EB" },
+      { label: "5+", color: "#1D4ED8" },
+    ];
+  }
+  if (indicator === "marches") {
+    return [
+      { label: "0", color: "#E5E7EB" },
+      { label: "2-4", color: "#F5A623" },
+      { label: "5-7", color: "#2E7D52" },
+      { label: "8+", color: "#1A2C42" },
+    ];
+  }
+  return [
+    { label: "< 70%", color: "#166534" },
+    { label: "70-85%", color: "#16A34A" },
+    { label: "85-105%", color: "#FDE68A" },
+    { label: "> 115%", color: "#DC2626" },
+  ];
 }
 
 function fillColor(region: RegionMetric, indicator: IndicatorKey, threshold: number) {
@@ -193,8 +240,9 @@ export default function BurkinaMap() {
   const activeCommodity = COMMODITIES.find((item) => item.key === commodity) ?? COMMODITIES[0];
   const activeIndicator = INDICATORS.find((item) => item.key === indicator) ?? INDICATORS[0];
   const start = periodStart(period);
+  const legendItems = indicatorLegend(indicator);
 
-  const { data: geojson } = useQuery<GeoJson>({
+  const { data: geojson, isLoading: geojsonLoading, isError: geojsonError } = useQuery<GeoJson>({
     queryKey: ["burkina-geojson"],
     queryFn: async () => {
       const response = await fetch("/geojson/burkina-regions.geojson");
@@ -207,8 +255,8 @@ export default function BurkinaMap() {
     queryKey: ["map-prices", commodity, period],
     queryFn: async () => {
       const results = await Promise.allSettled(
-        REGION_NAMES.map((region) =>
-          fetch(`/api/prices/latest?region=${encodeURIComponent(region)}`)
+        ["National", ...REGION_NAMES].map((region) =>
+          fetch(`/api/prices/latest?region=${encodeURIComponent(region)}&sources=wfp`)
             .then((response) => response.ok ? response.json() : [])
             .then((data: PriceRow[]) => {
               const match = data.find((row) => row.commodity === commodity);
@@ -242,7 +290,11 @@ export default function BurkinaMap() {
   });
 
   const metrics = useMemo<RegionMetric[]>(() => {
-    const pricesByRegion = new globalThis.Map(latestPrices.map((row) => [row.region, row]));
+    const pricesByRegion = new globalThis.Map(
+      latestPrices
+        .filter((row) => REGION_NAMES.includes(row.region))
+        .map((row) => [row.region, row])
+    );
     const geoDatasets = (datasets?.items ?? []).filter((item) => item.is_geo);
     const alertItems = alerts?.items ?? [];
     const features = geojson?.features ?? REGION_NAMES.map((name) => ({ properties: { name, capital: "" } } as GeoFeature));
@@ -250,7 +302,7 @@ export default function BurkinaMap() {
     return features.map((feature) => {
       const name = feature.properties.name;
       const price = pricesByRegion.get(name);
-      const marketCount = latestPrices.filter((row) => row.region === name).length;
+      const marketCount = price?.n_obs ?? latestPrices.filter((row) => row.region === name).length;
       const datasetCount = geoDatasets.filter((dataset) => {
         const haystack = `${dataset.name} ${dataset.category ?? ""}`.toLowerCase();
         return haystack.includes(name.toLowerCase()) || haystack.includes("burkina");
@@ -263,6 +315,8 @@ export default function BurkinaMap() {
         capital: feature.properties.capital ?? "",
         price: price?.price ?? null,
         priceDate: price?.price_date ?? null,
+        priceObs: price?.n_obs ?? null,
+        priceSource: price?.reporter ?? price?.source ?? null,
         markets: marketCount,
         datasets: datasetCount,
         ipcPhase: phase,
@@ -274,6 +328,32 @@ export default function BurkinaMap() {
   const selectedRegion = metrics.find((region) => region.name === selectedRegionName) ?? metrics[0];
   const layerState = Object.fromEntries(layers.map((layer) => [layer.key, layer.enabled]));
   const visibleRegions = metrics.filter((region) => metricValue(region, indicator) > 0).length;
+  const tracePrices = latestPrices.filter((row) => row.commodity === commodity);
+  const nationalPrice = tracePrices.find((row) => row.region === "National") ?? null;
+  const regionalPriceRows = tracePrices.filter((row) => REGION_NAMES.includes(row.region));
+  const hasRegionalPrices = regionalPriceRows.length > 0;
+  const latestObservationDate = tracePrices
+    .map((row) => row.price_date)
+    .filter(Boolean)
+    .sort()
+    .at(-1);
+  const totalPriceObservations = tracePrices.reduce((sum, row) => sum + (row.n_obs ?? 0), 0);
+  const sourceTrace = latestObservationDate
+    ? `HDX/WFP · ${formatPriceDate(latestObservationDate)} · ${totalPriceObservations || visibleRegions} obs.`
+    : "HDX/WFP · date indisponible · 0 obs.";
+
+  const sourceStatus = indicator === "prix_mais" && !hasRegionalPrices
+    ? "Prix WFP disponibles au niveau national ; aucune valeur régionale n'est inventée."
+    : `${activeIndicator.source} · ${PERIODS.find((item) => item.key === period)?.label ?? period}`;
+
+  const zoomIn = () => {
+    mapInstance.current?.zoomIn();
+  };
+
+  const resetMapView = () => {
+    setSelectedRegionName("Sahel");
+    mapInstance.current?.setView([12.4, -1.5], 6);
+  };
 
   useEffect(() => {
     if (!geojson || !mapRef.current) return;
@@ -314,9 +394,10 @@ export default function BurkinaMap() {
       const geoLayer = L.geoJSON(geojson as any, {
         style: (feature: any) => {
           const region = metricByName.get(feature?.properties?.name ?? "");
+          const value = region ? metricValue(region, indicator) : 0;
           return {
             fillColor: region ? fillColor(region, indicator, activeCommodity.threshold) : "#E5E7EB",
-            fillOpacity: region ? 0.82 : 0.25,
+            fillOpacity: value ? 0.82 : 0.42,
             color: feature?.properties?.name === selectedRegionName ? "#1A2C42" : "#FFFFFF",
             weight: feature?.properties?.name === selectedRegionName ? 3 : 1.4,
           };
@@ -337,10 +418,11 @@ export default function BurkinaMap() {
               try { map.fitBounds(layer.getBounds(), { padding: [28, 28] }); } catch { /* noop */ }
             },
           });
-          layer.bindTooltip(
-            `<strong>${name}</strong><br/>${region ? formatMetric(region, indicator, activeIndicator.unit) : "Pas de donnees"}`,
-            { sticky: true }
-          );
+          const tooltipMetric = region ? formatMetric(region, indicator, activeIndicator.unit) : "Pas de données";
+          const tooltipSource = indicator === "prix_mais" && !region?.price
+            ? "Référence nationale WFP disponible"
+            : activeIndicator.source;
+          layer.bindTooltip(`<strong>${name}</strong><br/>${tooltipMetric}<br/><span>${tooltipSource}</span>`, { sticky: true });
         },
       }).addTo(map);
 
@@ -390,7 +472,12 @@ export default function BurkinaMap() {
         });
       }
 
-      map.fitBounds(geoLayer.getBounds(), { padding: [18, 18] });
+      const bounds = geoLayer.getBounds();
+      if (bounds.isValid()) {
+        map.fitBounds(bounds, { padding: [18, 18] });
+      } else {
+        map.setView([12.4, -1.5], 6);
+      }
       mapInstance.current = map;
     };
 
@@ -403,7 +490,7 @@ export default function BurkinaMap() {
       }
       destroyLeafletContainer(mapRef.current);
     };
-  }, [activeCommodity.threshold, activeIndicator.unit, geojson, indicator, layerState.alerts, layerState.datasets, layerState.labels, layerState.markets, metrics, selectedRegionName]);
+  }, [activeCommodity.threshold, activeIndicator.source, activeIndicator.unit, geojson, indicator, layerState.alerts, layerState.datasets, layerState.labels, layerState.markets, metrics, selectedRegionName]);
 
   return (
     <div className="min-h-[calc(100vh-64px)] bg-[#F4F6FA]">
@@ -416,7 +503,7 @@ export default function BurkinaMap() {
             <h1 className="mt-1 text-xl font-bold text-gray-900">Carte interactive du Burkina Faso</h1>
           </div>
           <div className="hidden items-center gap-3 md:flex">
-            <span className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-[#E04E2F]">GeoJSON · WFP · FasoData</span>
+            <span className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-[#E04E2F]">GeoJSON · {sourceTrace}</span>
             <button className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 text-gray-500">
               <Bell className="h-4 w-4" />
             </button>
@@ -483,10 +570,15 @@ export default function BurkinaMap() {
 
           <section className="mt-8 rounded-2xl bg-gray-50 p-4">
             <h3 className="mb-3 text-sm font-bold text-gray-900">{activeIndicator.label}</h3>
-            <div className="h-4 rounded-full bg-gradient-to-r from-[#E7F4EC] via-[#FDE68A] via-[#F97316] to-[#DC2626]" />
-            <div className="mt-2 flex justify-between text-xs text-gray-500">
-              {activeIndicator.range.map((item) => <span key={item}>{item}</span>)}
+            <div className="grid grid-cols-4 overflow-hidden rounded-full border border-white">
+              {legendItems.map((item) => (
+                <span key={item.label} className="h-4" style={{ backgroundColor: item.color }} />
+              ))}
             </div>
+            <div className="mt-2 flex justify-between gap-2 text-xs text-gray-500">
+              {legendItems.map((item) => <span key={item.label}>{item.label}</span>)}
+            </div>
+            <p className="mt-3 text-xs leading-5 text-gray-500">{sourceStatus}</p>
           </section>
         </aside>
 
@@ -496,7 +588,7 @@ export default function BurkinaMap() {
               <MapIcon className="h-4 w-4" /> Vue : choroplèthe <ChevronDown className="h-4 w-4 text-gray-400" />
             </button>
             <span className="inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-gray-800 shadow-sm ring-1 ring-gray-200">
-              <SlidersHorizontal className="h-4 w-4" /> {visibleRegions} régions avec données
+              <SlidersHorizontal className="h-4 w-4" /> {indicator === "prix_mais" ? `${regionalPriceRows.length} régions WFP` : `${visibleRegions} régions avec données`}
             </span>
             <span className="inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-gray-800 shadow-sm ring-1 ring-gray-200">
               <span className={cn("h-2.5 w-2.5 rounded-full", pricesFetching ? "bg-amber-500" : "bg-green-600")} /> {pricesFetching ? "Mise à jour..." : "Données synchronisées"}
@@ -511,16 +603,42 @@ export default function BurkinaMap() {
 
           <div ref={mapRef} className="absolute inset-0 z-0" />
 
-          <div className="absolute bottom-5 left-5 z-[400] rounded-xl bg-white px-4 py-3 shadow-sm ring-1 ring-gray-200">
+          {(geojsonLoading || geojsonError) && (
+            <div className="absolute inset-0 z-[450] flex items-center justify-center bg-white/80 backdrop-blur-sm">
+              <div className="rounded-2xl border border-gray-100 bg-white px-6 py-5 text-center shadow-sm">
+                {geojsonError ? (
+                  <>
+                    <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-amber-500" />
+                    <p className="font-bold text-gray-900">Carte GeoJSON indisponible</p>
+                    <p className="mt-1 text-sm text-gray-500">Le fond régional du Burkina Faso n'a pas pu être chargé.</p>
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="mx-auto mb-3 h-8 w-8 animate-spin text-[#E04E2F]" />
+                    <p className="font-bold text-gray-900">Chargement du fond cartographique</p>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="absolute bottom-5 left-5 right-20 z-[400] rounded-xl bg-white/95 px-4 py-3 text-xs text-gray-600 shadow-sm ring-1 ring-gray-200 backdrop-blur">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="font-bold text-gray-900">{sourceTrace}</span>
+              <span>{sourceStatus}</span>
+            </div>
+          </div>
+
+          <div className="absolute bottom-24 left-5 z-[400] rounded-xl bg-white px-4 py-3 shadow-sm ring-1 ring-gray-200">
             <div className="flex items-center gap-3 text-sm text-gray-500">
               <span className="h-1.5 w-20 rounded-full bg-[#1A2C42]" /> 100 km
             </div>
           </div>
 
           <div className="absolute bottom-5 right-5 z-[400] flex flex-col gap-2">
-            <button className="flex h-11 w-11 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-gray-200" aria-label="Zoomer sur la carte"><ZoomIn className="h-4 w-4" /></button>
+            <button onClick={zoomIn} className="flex h-11 w-11 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-gray-200" aria-label="Zoomer sur la carte"><ZoomIn className="h-4 w-4" /></button>
             <button className="flex h-11 w-11 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-gray-200" aria-label="Afficher les options de la carte"><MoreHorizontal className="h-4 w-4" /></button>
-            <button onClick={() => setSelectedRegionName("Sahel")} className="flex h-11 w-11 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-gray-200" aria-label="Réinitialiser la sélection de région"><RotateCcw className="h-4 w-4" /></button>
+            <button onClick={resetMapView} className="flex h-11 w-11 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-gray-200" aria-label="Réinitialiser la sélection de région"><RotateCcw className="h-4 w-4" /></button>
           </div>
         </main>
 
@@ -547,8 +665,30 @@ export default function BurkinaMap() {
             <p className="mt-3 text-4xl font-bold text-gray-900">
               {selectedRegion ? formatMetric(selectedRegion, indicator, activeIndicator.unit) : "-"}
             </p>
-            {indicator === "prix_mais" && selectedRegion?.priceDate && (
-              <p className="mt-2 text-xs text-gray-400">Dernière observation : {selectedRegion.priceDate}</p>
+            {indicator === "prix_mais" && (
+              <div className="mt-3 rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                {selectedRegion?.priceDate ? (
+                  <p className="text-xs text-gray-500">
+                    Région · {selectedRegion.priceSource ?? "HDX/WFP"} · {formatPriceDate(selectedRegion.priceDate) ?? selectedRegion.priceDate} · {selectedRegion.priceObs ?? selectedRegion.markets} obs.
+                  </p>
+                ) : nationalPrice ? (
+                  <>
+                    <p className="text-xs font-bold uppercase tracking-wide text-gray-400">Référence nationale WFP</p>
+                    <div className="mt-2 flex items-baseline gap-1.5">
+                      <span className="text-2xl font-bold text-gray-900">{Math.round(nationalPrice.price)}</span>
+                      <span className="text-xs text-gray-500">CFA/kg</span>
+                    </div>
+                    <p className="mt-1 text-xs text-gray-500">
+                      {formatPriceDate(nationalPrice.price_date) ?? "date indisponible"} · {nationalPrice.n_obs ?? 0} obs. · {nationalPrice.reporter ?? "HDX/WFP"}
+                    </p>
+                    <p className="mt-2 text-xs leading-5 text-amber-700">
+                      Aucune donnée régionale WFP disponible localement pour {selectedRegion?.name}. Cette référence nationale est affichée sans colorer la région.
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-xs text-gray-500">Aucune observation WFP disponible pour ce produit.</p>
+                )}
+              </div>
             )}
           </div>
 
@@ -560,7 +700,7 @@ export default function BurkinaMap() {
             {selectedRegion && [
               ["Prix", selectedRegion.price ? `${Math.round(selectedRegion.price)} CFA/kg` : "Pas de données", "text-[#E04E2F]"],
               ["Phase IPC estimée", `Phase ${selectedRegion.ipcPhase}`, "text-amber-600"],
-              ["Marchés suivis", selectedRegion.markets, "text-gray-900"],
+              ["Observations WFP", selectedRegion.markets || nationalPrice?.n_obs || 0, "text-gray-900"],
               ["Datasets géo", selectedRegion.datasets, "text-blue-600"],
               ["Alertes", selectedRegion.alert ? "Active" : "Aucune", selectedRegion.alert ? "text-[#E04E2F]" : "text-green-700"],
             ].map(([label, value, color]) => (

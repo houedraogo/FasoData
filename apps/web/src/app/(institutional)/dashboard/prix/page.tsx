@@ -149,7 +149,7 @@ export default function PrixPage() {
     queries: ALL_COMMODITIES.map((c) => ({
       queryKey: ["prices", c.key, region, granularity, startYear],
       queryFn: async (): Promise<PriceSeries> => {
-        const p = new URLSearchParams({ commodity: c.key, region, granularity, ...(start && { start }) });
+        const p = new URLSearchParams({ commodity: c.key, region, granularity, sources: "wfp", ...(start && { start }) });
         const { data } = await api.get(`/prices/series?${p}`);
         return data;
       },
@@ -162,7 +162,7 @@ export default function PrixPage() {
     queries: ALL_REGIONS.map((r) => ({
       queryKey: ["prices", commodity, r.key, granularity, startYear],
       queryFn: async (): Promise<PriceSeries> => {
-        const p = new URLSearchParams({ commodity, region: r.key, granularity, ...(start && { start }) });
+        const p = new URLSearchParams({ commodity, region: r.key, granularity, sources: "wfp", ...(start && { start }) });
         const { data } = await api.get(`/prices/series?${p}`);
         return data;
       },
@@ -178,6 +178,7 @@ export default function PrixPage() {
         commodity: commodityForCountries,
         countries: selectedCountries.join(","),
         granularity,
+        sources: "wfp",
         ...(start && { start }),
       });
       const { data } = await api.get(`/prices/compare?${p}`);
@@ -279,6 +280,16 @@ export default function PrixPage() {
   });
 
   // ── Variation annuelle sorgho (tableau onglet chart) ───────────────────────
+  const sourceSeries = mode === "commodities"
+    ? commodityMap[activeCommodities[0]?.key]
+    : mode === "regions"
+    ? regionMap[activeRegions[0]?.key]
+    : countrySeriesMap[activeCountries[0]?.key];
+  const sourceLastPoint = sourceSeries?.points.at(-1);
+  const sourceTrace = sourceLastPoint
+    ? `HDX/WFP · ${formatPeriod(sourceLastPoint.period, granularity)} · ${sourceLastPoint.n_obs ?? 0} obs.`
+    : "HDX/WFP · date indisponible · 0 obs.";
+
   const annualData = useMemo(() => {
     const targetSeries = mode === "countries"
       ? countrySeriesMap[selectedCountries[0]]
@@ -398,7 +409,7 @@ export default function PrixPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Évolution des prix alimentaires</h1>
           <p className="text-gray-500 text-sm mt-1">
-            {mode === "countries" ? "Données publiques WFP · Sahel central" : "Données HDX/WFP + terrain FasoData · Burkina Faso"} · {titleLine}
+            Source publique {sourceTrace} · {mode === "countries" ? "Sahel central" : "Burkina Faso"} · {titleLine}
           </p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
@@ -637,7 +648,7 @@ export default function PrixPage() {
             </span>
           ))}
           <span className="text-gray-300 ml-auto">
-            Source : {mode === "countries" ? "HDX/WFP Food Prices" : "HDX/WFP + terrain FasoData"}
+            Source : {sourceTrace}
           </span>
         </div>
       </div>

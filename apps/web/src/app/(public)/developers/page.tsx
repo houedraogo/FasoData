@@ -24,6 +24,7 @@ import {
   Timer,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/lib/i18n";
 
 type Lang = "curl" | "python" | "javascript";
 type Endpoint = { method: string; path: string; scope: string; desc: string; tag?: string };
@@ -90,7 +91,7 @@ const SDK_SNIPPETS: Record<Lang, string> = {
 curl "${BASE_URL}/api/search?q=prix%20mil" \\
   -H "Authorization: Bearer $FASODATA_TOKEN"
 
-curl "${BASE_URL}/api/prices/latest?region=Sahel" \\
+curl "${BASE_URL}/api/prices/latest?region=National&sources=wfp" \\
   -H "Authorization: Bearer $FASODATA_TOKEN"`,
   python: `from typing import Any
 import requests
@@ -111,7 +112,7 @@ class FasoDataClient:
         return response.json()
 
 client = FasoDataClient("<access_token>")
-print(client.get("/api/prices/latest", region="Sahel"))`,
+print(client.get("/api/prices/latest", region="National", sources="wfp"))`,
   javascript: `class FasoDataClient {
   constructor(token, baseUrl = "${BASE_URL}") {
     this.token = token;
@@ -130,7 +131,7 @@ print(client.get("/api/prices/latest", region="Sahel"))`,
 }
 
 const client = new FasoDataClient("<access_token>");
-console.log(await client.get("/api/prices/latest", { region: "Sahel" }));`,
+console.log(await client.get("/api/prices/latest", { region: "National", sources: "wfp" }));`,
 };
 
 const FALLBACK_ENDPOINTS: Endpoint[] = [
@@ -213,7 +214,7 @@ function endpointsFromOpenApi(schema: OpenApiSchema | null): Endpoint[] {
     .sort((a, b) => a.path.localeCompare(b.path) || a.method.localeCompare(b.method));
 }
 
-function CodeBlock({ code }: { code: string }) {
+function CodeBlock({ code, exampleLabel, copyLabel, copiedLabel }: { code: string; exampleLabel: string; copyLabel: string; copiedLabel: string }) {
   const [copied, setCopied] = useState(false);
   const copy = async () => {
     await navigator.clipboard?.writeText(code);
@@ -224,14 +225,14 @@ function CodeBlock({ code }: { code: string }) {
   return (
     <div className="min-w-0 overflow-hidden rounded-xl border border-slate-700 bg-[#0F172A]">
       <div className="flex items-center justify-between border-b border-white/10 px-4 py-2">
-        <span className="text-xs font-semibold text-slate-300">Exemple</span>
+        <span className="text-xs font-semibold text-slate-300">{exampleLabel}</span>
         <button
           type="button"
           onClick={copy}
           className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-2.5 py-1 text-xs font-semibold text-white"
-          aria-label="Copier l'exemple de code"
+          aria-label={copyLabel}
         >
-          <Copy className="h-3.5 w-3.5" /> {copied ? "Copie" : "Copier"}
+          <Copy className="h-3.5 w-3.5" /> {copied ? copiedLabel : copyLabel}
         </button>
       </div>
       <pre className="overflow-x-auto p-4 text-sm leading-6 text-slate-100">
@@ -242,6 +243,7 @@ function CodeBlock({ code }: { code: string }) {
 }
 
 export default function DevelopersPage() {
+  const { t } = useLanguage();
   const [lang, setLang] = useState<Lang>("curl");
   const [schema, setSchema] = useState<OpenApiSchema | null>(null);
   const [schemaError, setSchemaError] = useState(false);
@@ -287,13 +289,13 @@ export default function DevelopersPage() {
           <div>
             <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white/80 ring-1 ring-white/10">
               <Activity className="h-3.5 w-3.5 text-[#E04E2F]" />
-              FasoData Developers
+              {t("dev.badge")}
             </div>
             <h1 className="mt-5 max-w-3xl text-4xl font-bold tracking-tight sm:text-5xl">
-              API de donnees ouvertes pour le Burkina Faso
+              {t("dev.title")}
             </h1>
             <p className="mt-5 max-w-2xl text-base leading-7 text-slate-300">
-              Consultez une documentation maintenue depuis OpenAPI, interrogez le catalogue, automatisez les imports et lancez des exports depuis vos outils terrain, SIG ou tableaux de bord.
+              {t("dev.description")}
             </p>
             <div className="mt-5 flex flex-wrap gap-2 text-xs font-semibold text-slate-300">
               <span className="rounded-full bg-white/10 px-3 py-1 ring-1 ring-white/10">
@@ -308,29 +310,34 @@ export default function DevelopersPage() {
             </div>
             <div className="mt-8 flex flex-wrap gap-3">
               <a href="#quickstart" className="inline-flex items-center gap-2 rounded-xl bg-[#E04E2F] px-5 py-3 text-sm font-bold text-white">
-                <Terminal className="h-4 w-4" /> Demarrer
+                <Terminal className="h-4 w-4" /> {t("dev.startButton")}
               </a>
               <a href="/docs" className="inline-flex items-center gap-2 rounded-xl border border-white/15 px-5 py-3 text-sm font-bold text-white/90">
-                <BookOpen className="h-4 w-4" /> Swagger UI
+                <BookOpen className="h-4 w-4" /> {t("dev.swaggerui")}
               </a>
             </div>
           </div>
 
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-2xl">
             <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-300">
-              <KeyRound className="h-4 w-4 text-[#E04E2F]" /> Authentification Bearer
+              <KeyRound className="h-4 w-4 text-[#E04E2F]" /> {t("dev.authBearer")}
             </div>
-            <CodeBlock code={`Authorization: Bearer <access_token>\nBase URL: ${BASE_URL}\nFormat: application/json\nUpload: multipart/form-data`} />
+            <CodeBlock
+              code={`Authorization: Bearer <access_token>\nBase URL: ${BASE_URL}\nFormat: application/json\nUpload: multipart/form-data`}
+              exampleLabel={t("dev.example")}
+              copyLabel={t("dev.copy")}
+              copiedLabel={t("dev.copied")}
+            />
           </div>
         </div>
       </section>
 
       <section className="mx-auto grid max-w-7xl gap-4 px-4 py-8 sm:px-6 md:grid-cols-4 lg:px-8">
         {[
-          { label: "Version API", value: schema?.info?.version ?? "1.0.0", icon: Server },
-          { label: "Endpoints", value: String(endpoints.length), icon: Shield },
-          { label: "Limite dev", value: "30 req/s", icon: Timer },
-          { label: "Pagination max", value: "100 lignes", icon: Layers },
+          { label: t("dev.label.apiVersion"), value: schema?.info?.version ?? "1.0.0", icon: Server },
+          { label: t("dev.label.endpoints"),  value: String(endpoints.length), icon: Shield },
+          { label: t("dev.label.devLimit"),   value: t("dev.label.devLimitValue"), icon: Timer },
+          { label: t("dev.label.pagination"), value: t("dev.label.paginationValue"), icon: Layers },
         ].map(({ label, value, icon: Icon }) => (
           <div key={label} className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
             <Icon className="h-5 w-5 text-[#E04E2F]" />
@@ -344,13 +351,13 @@ export default function DevelopersPage() {
         <aside className="hidden lg:block">
           <div className="sticky top-24 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
             {[
-              ["Quickstart", "#quickstart"],
-              ["Authentification", "#auth"],
-              ["Quotas", "#quotas"],
-              ["Versions", "#versions"],
-              ["Endpoints", "#endpoints"],
-              ["SDK snippets", "#sdk"],
-              ["Erreurs", "#errors"],
+              [t("dev.nav.quickstart"), "#quickstart"],
+              [t("dev.nav.auth"),       "#auth"],
+              [t("dev.nav.quotas"),     "#quotas"],
+              [t("dev.nav.versions"),   "#versions"],
+              [t("dev.nav.endpoints"),  "#endpoints"],
+              [t("dev.nav.sdk"),        "#sdk"],
+              [t("dev.nav.errors"),     "#errors"],
             ].map(([label, href]) => (
               <a key={href} href={href} className="block rounded-xl px-3 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50 hover:text-gray-900">
                 {label}
@@ -363,8 +370,8 @@ export default function DevelopersPage() {
           <section id="quickstart" className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">Demarrage rapide</h2>
-                <p className="mt-1 text-sm text-gray-500">Authentifiez-vous puis listez les datasets publics.</p>
+                <h2 className="text-2xl font-bold text-gray-900">{t("dev.quickstartTitle")}</h2>
+                <p className="mt-1 text-sm text-gray-500">{t("dev.quickstartDesc")}</p>
               </div>
               <div className="flex rounded-xl bg-gray-100 p-1">
                 {(["curl", "python", "javascript"] as Lang[]).map((item) => (
@@ -379,30 +386,30 @@ export default function DevelopersPage() {
               </div>
             </div>
             <div className="mt-5">
-              <CodeBlock code={QUICK_START[lang]} />
+              <CodeBlock code={QUICK_START[lang]} exampleLabel={t("dev.example")} copyLabel={t("dev.copy")} copiedLabel={t("dev.copied")} />
             </div>
           </section>
 
           <section id="auth" className="grid gap-5 md:grid-cols-2">
             <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
               <Lock className="h-5 w-5 text-[#E04E2F]" />
-              <h2 className="mt-4 text-xl font-bold text-gray-900">Authentification</h2>
+              <h2 className="mt-4 text-xl font-bold text-gray-900">{t("dev.authTitle")}</h2>
               <p className="mt-2 text-sm leading-6 text-gray-600">
-                L'API utilise OAuth2 password flow. Le endpoint `/api/auth/login` retourne un `access_token` pour les appels API et un `refresh_token` pour renouveler la session.
+                {t("dev.authDesc")}
               </p>
               <div className="mt-4 rounded-xl bg-gray-50 p-4 text-sm text-gray-700">
-                <p className="font-bold text-gray-900">Header requis</p>
+                <p className="font-bold text-gray-900">{t("dev.authHeader")}</p>
                 <p className="mt-1 font-mono text-xs">Authorization: Bearer &lt;access_token&gt;</p>
               </div>
             </div>
               <div id="quotas" className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
               <Timer className="h-5 w-5 text-[#E04E2F]" />
-              <h2 className="mt-4 text-xl font-bold text-gray-900">Quotas & limites</h2>
+              <h2 className="mt-4 text-xl font-bold text-gray-900">{t("dev.quotasTitle")}</h2>
               <div className="mt-4 space-y-3 text-sm text-gray-600">
-                <p><span className="font-bold text-gray-900">Rate limit dev :</span> 30 requetes/seconde, burst 50 via Nginx.</p>
-                <p><span className="font-bold text-gray-900">Pagination :</span> `page_size` entre 1 et 100 selon les listes.</p>
-                <p><span className="font-bold text-gray-900">Upload :</span> taille maximale proxy 50 Mo.</p>
-                <p><span className="font-bold text-gray-900">Geo bbox :</span> limite maximale 5 000 features.</p>
+                <p><span className="font-bold text-gray-900">{t("dev.quota.rateLimit")}</span> {t("dev.quota.rateLimitDesc")}</p>
+                <p><span className="font-bold text-gray-900">{t("dev.quota.pagination")}</span> {t("dev.quota.paginationDesc")}</p>
+                <p><span className="font-bold text-gray-900">{t("dev.quota.upload")}</span> {t("dev.quota.uploadDesc")}</p>
+                <p><span className="font-bold text-gray-900">{t("dev.quota.geoBbox")}</span> {t("dev.quota.geoBboxDesc")}</p>
               </div>
             </div>
           </section>
@@ -411,9 +418,9 @@ export default function DevelopersPage() {
             <div className="flex items-center gap-3">
               <Server className="h-5 w-5 text-[#E04E2F]" />
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">Versions & maintenance</h2>
+                <h2 className="text-2xl font-bold text-gray-900">{t("dev.versionsTitle")}</h2>
                 <p className="mt-1 text-sm text-gray-500">
-                  La reference ci-dessous est generee depuis le schema OpenAPI expose par le backend.
+                  {t("dev.versionsDesc")}
                 </p>
               </div>
             </div>
@@ -433,11 +440,9 @@ export default function DevelopersPage() {
           <section id="endpoints" className="rounded-2xl border border-gray-100 bg-white shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-100 p-6">
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">Reference endpoints</h2>
+                <h2 className="text-2xl font-bold text-gray-900">{t("dev.endpointsTitle")}</h2>
                 <p className="mt-1 text-sm text-gray-500">
-                  {schemaError
-                    ? "OpenAPI indisponible : affichage de secours depuis la derniere reference connue."
-                    : "Routes chargees automatiquement depuis /openapi.json."}
+                  {schemaError ? t("dev.endpointsError") : t("dev.endpointsLoaded")}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -447,22 +452,22 @@ export default function DevelopersPage() {
                   className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-bold text-gray-700"
                   disabled={schemaLoading}
                 >
-                  <RefreshCw className={cn("h-4 w-4", schemaLoading && "animate-spin")} /> Synchroniser
+                  <RefreshCw className={cn("h-4 w-4", schemaLoading && "animate-spin")} /> {t("dev.sync")}
                 </button>
                 <a href="/openapi.json" className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-bold text-gray-700">
-                  <Download className="h-4 w-4" /> Schema
+                  <Download className="h-4 w-4" /> {t("dev.schema")}
                 </a>
               </div>
             </div>
             <div className="flex flex-col gap-3 border-b border-gray-100 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="relative w-full sm:max-w-sm">
-                <label htmlFor="endpoint-search" className="sr-only">Rechercher un endpoint</label>
+                <label htmlFor="endpoint-search" className="sr-only">{t("dev.filterPlaceholder")}</label>
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                 <input
                   id="endpoint-search"
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Filtrer par route, methode, tag..."
+                  placeholder={t("dev.filterPlaceholder")}
                   className="w-full rounded-xl border border-gray-200 py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#E04E2F]/20"
                 />
               </div>
@@ -475,18 +480,18 @@ export default function DevelopersPage() {
             {schemaError && (
               <div className="mx-6 mt-5 flex gap-3 rounded-xl border border-amber-100 bg-amber-50 p-4 text-sm text-amber-900">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                <p>Le schema OpenAPI n'a pas pu etre charge. La reference reste lisible, mais elle peut etre moins a jour que le backend.</p>
+                <p>{t("dev.endpointsSchemaError")}</p>
               </div>
             )}
             <div className="overflow-x-auto">
               <table className="w-full min-w-[820px] text-left text-sm">
                 <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-400">
                   <tr>
-                    <th className="px-5 py-3">Methode</th>
-                    <th className="px-5 py-3">Endpoint</th>
-                    <th className="px-5 py-3">Tag</th>
-                    <th className="px-5 py-3">Acces</th>
-                    <th className="px-5 py-3">Description</th>
+                    <th className="px-5 py-3">{t("dev.tableMethod")}</th>
+                    <th className="px-5 py-3">{t("dev.tableEndpoint")}</th>
+                    <th className="px-5 py-3">{t("dev.tableTag")}</th>
+                    <th className="px-5 py-3">{t("dev.tableAccess")}</th>
+                    <th className="px-5 py-3">{t("dev.tableDescription")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -508,7 +513,7 @@ export default function DevelopersPage() {
                   {!filteredEndpoints.length && (
                     <tr>
                       <td colSpan={5} className="px-5 py-12 text-center text-sm text-gray-400">
-                        Aucun endpoint ne correspond a ce filtre.
+                        {t("dev.noEndpoint")}
                       </td>
                     </tr>
                   )}
@@ -520,8 +525,8 @@ export default function DevelopersPage() {
           <section id="sdk" className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">SDK snippets</h2>
-                <p className="mt-1 text-sm text-gray-500">Bases reutilisables pour integrer FasoData dans un service ou un notebook.</p>
+                <h2 className="text-2xl font-bold text-gray-900">{t("dev.sdkTitle")}</h2>
+                <p className="mt-1 text-sm text-gray-500">{t("dev.sdkDesc")}</p>
               </div>
               <div className="flex rounded-xl bg-gray-100 p-1">
                 {(["curl", "python", "javascript"] as Lang[]).map((item) => (
@@ -538,30 +543,30 @@ export default function DevelopersPage() {
               </div>
             </div>
             <div className="mt-5">
-              <CodeBlock code={SDK_SNIPPETS[lang]} />
+              <CodeBlock code={SDK_SNIPPETS[lang]} exampleLabel={t("dev.example")} copyLabel={t("dev.copy")} copiedLabel={t("dev.copied")} />
             </div>
           </section>
 
           <section className="grid gap-5 md:grid-cols-3">
             {[
-              { title: "Catalogue", icon: Database, text: "Filtrez par categorie, statut et texte libre avec pagination standard." },
-              { title: "Recherche", icon: Search, text: "Interrogez Meilisearch sur tous les datasets indexes ou un dataset cible." },
-              { title: "Geospatial", icon: Map, text: "Recuperez des FeatureCollections par bbox et les centroides PostGIS." },
-              { title: "Exports", icon: Download, text: "Lancez des exports CSV asynchrones et suivez les taches Celery." },
-              { title: "Comptes", icon: KeyRound, text: "Gerez inscription, login, refresh token et profil utilisateur." },
-              { title: "Monitoring", icon: Globe, text: "Healthcheck public et metriques Prometheus disponibles cote API." },
-            ].map(({ title, icon: Icon, text }) => (
-              <div key={title} className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+              { titleKey: "dev.cat.catalogue", icon: Database, textKey: "dev.cat.catalogue.desc" },
+              { titleKey: "dev.cat.search",    icon: Search,   textKey: "dev.cat.search.desc" },
+              { titleKey: "dev.cat.geo",       icon: Map,      textKey: "dev.cat.geo.desc" },
+              { titleKey: "dev.cat.exports",   icon: Download, textKey: "dev.cat.exports.desc" },
+              { titleKey: "dev.cat.accounts",  icon: KeyRound, textKey: "dev.cat.accounts.desc" },
+              { titleKey: "dev.cat.monitoring",icon: Globe,    textKey: "dev.cat.monitoring.desc" },
+            ].map(({ titleKey, icon: Icon, textKey }) => (
+              <div key={titleKey} className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
                 <Icon className="h-5 w-5 text-[#E04E2F]" />
-                <h3 className="mt-4 font-bold text-gray-900">{title}</h3>
-                <p className="mt-2 text-sm leading-6 text-gray-600">{text}</p>
+                <h3 className="mt-4 font-bold text-gray-900">{t(titleKey)}</h3>
+                <p className="mt-2 text-sm leading-6 text-gray-600">{t(textKey)}</p>
               </div>
             ))}
           </section>
 
           <section id="errors" className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-            <h2 className="text-2xl font-bold text-gray-900">Erreurs API</h2>
-            <p className="mt-1 text-sm text-gray-500">Les erreurs suivent le format FastAPI standard avec un champ `detail`.</p>
+            <h2 className="text-2xl font-bold text-gray-900">{t("dev.errorsTitle")}</h2>
+            <p className="mt-1 text-sm text-gray-500">{t("dev.errorsDesc")}</p>
             <div className="mt-5 grid gap-3 md:grid-cols-2">
               {ERROR_CODES.map((error) => (
                 <div key={error.code} className="flex gap-3 rounded-xl border border-gray-100 p-4">
@@ -579,9 +584,9 @@ export default function DevelopersPage() {
             <div className="flex gap-3">
               <CheckCircle className="mt-0.5 h-5 w-5 shrink-0 text-green-700" />
               <div>
-                <h2 className="font-bold text-green-950">Pret pour developers.fasodata.bf</h2>
+                <h2 className="font-bold text-green-950">{t("dev.ready")}</h2>
                 <p className="mt-1 text-sm leading-6 text-green-900">
-                  Cette page peut etre servie sous `/developers` ou mappee sur le sous-domaine `developers.fasodata.bf` par le reverse proxy.
+                  {t("dev.readyDesc")}
                 </p>
               </div>
             </div>

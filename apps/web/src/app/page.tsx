@@ -8,7 +8,7 @@ import { Footer } from "@/components/layout/Footer";
 import PrixDuJourWidget from "@/components/home/PrixDuJourWidget";
 import { useLanguage } from "@/lib/i18n";
 
-interface PublicStats { datasets: number; categories: number; downloads: number; price_observations: number; }
+interface PublicStats { datasets: number; categories: number; downloads: number; price_observations: number; organizations: number; }
 
 function fmt(n: number): string {
   if (n >= 1000) return `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k+`;
@@ -16,12 +16,12 @@ function fmt(n: number): string {
 }
 
 const categoryMeta = [
-  { fr: "Agriculture", en: "Agriculture", icon: "A", count: 124, color: "bg-green-50 text-green-700 border-green-200" },
-  { fr: "Sante", en: "Health", icon: "S", count: 98, color: "bg-red-50 text-red-700 border-red-200" },
-  { fr: "Education", en: "Education", icon: "E", count: 76, color: "bg-blue-50 text-blue-700 border-blue-200" },
-  { fr: "Economie", en: "Economy", icon: "Eco", count: 112, color: "bg-purple-50 text-purple-700 border-purple-200" },
-  { fr: "Geographie", en: "Geography", icon: "G", count: 89, color: "bg-yellow-50 text-yellow-700 border-yellow-200" },
-  { fr: "Environnement", en: "Environment", icon: "Env", count: 67, color: "bg-teal-50 text-teal-700 border-teal-200" },
+  { fr: "Agriculture", en: "Agriculture", icon: "A", color: "bg-green-50 text-green-700 border-green-200" },
+  { fr: "Sante", en: "Health", icon: "S", color: "bg-red-50 text-red-700 border-red-200" },
+  { fr: "Education", en: "Education", icon: "E", color: "bg-blue-50 text-blue-700 border-blue-200" },
+  { fr: "Economie", en: "Economy", icon: "Eco", color: "bg-purple-50 text-purple-700 border-purple-200" },
+  { fr: "Geographie", en: "Geography", icon: "G", color: "bg-yellow-50 text-yellow-700 border-yellow-200" },
+  { fr: "Environnement", en: "Environment", icon: "Env", color: "bg-teal-50 text-teal-700 border-teal-200" },
 ];
 
 export default function HomePage() {
@@ -69,10 +69,10 @@ export default function HomePage() {
         };
 
   const stats = [
-    { value: publicStats ? fmt(publicStats.datasets) : "—", label: t("home.stats.datasets") },
-    { value: publicStats ? `${publicStats.categories}` : "—", label: t("home.stats.categories") },
-    { value: publicStats ? fmt(publicStats.price_observations) : "—", label: locale === "fr" ? "Relevés de prix" : "Price records" },
-    { value: publicStats ? fmt(publicStats.downloads) : "—", label: t("home.stats.downloads") },
+    { value: publicStats ? fmt(publicStats.datasets) : "—",      label: t("home.stats.datasets") },
+    { value: publicStats ? `${publicStats.categories}` : "—",    label: t("home.stats.categories") },
+    { value: publicStats ? fmt(publicStats.organizations) : "—", label: t("home.stats.partners") },
+    { value: publicStats ? fmt(publicStats.downloads) : "—",     label: t("home.stats.downloads") },
   ];
 
   const features = [
@@ -186,8 +186,8 @@ export default function HomePage() {
                     <Database className="w-5 h-5 text-[#E04E2F]" />
                   </div>
                   <div>
-                    <p className="text-white font-bold text-xl leading-none">1 200+</p>
-                    <p className="text-white/50 text-xs mt-0.5">Datasets publics</p>
+                    <p className="text-white font-bold text-xl leading-none">{publicStats ? fmt(publicStats.datasets) : "—"}</p>
+                    <p className="text-white/50 text-xs mt-0.5">{t("home.stats.datasets")}</p>
                   </div>
                 </div>
                 <div className="bg-white/10 backdrop-blur-sm border border-white/15 rounded-2xl p-4 flex items-center gap-3">
@@ -195,8 +195,8 @@ export default function HomePage() {
                     <BarChart3 className="w-5 h-5 text-green-400" />
                   </div>
                   <div>
-                    <p className="text-white font-bold text-xl leading-none">15k+</p>
-                    <p className="text-white/50 text-xs mt-0.5">Téléchargements/mois</p>
+                    <p className="text-white font-bold text-xl leading-none">{publicStats ? fmt(publicStats.organizations) : "—"}</p>
+                    <p className="text-white/50 text-xs mt-0.5">{t("home.stats.partners")}</p>
                   </div>
                 </div>
               </div>
@@ -251,9 +251,9 @@ export default function HomePage() {
 
                   <div className="grid grid-cols-3 gap-3 mb-5">
                     {[
-                      ["1 200+", "Datasets"],
-                      ["3 026", "Prix"],
-                      ["13", "Regions"],
+                      [publicStats ? fmt(publicStats.datasets) : "—",      t("home.stats.datasets")],
+                      [publicStats ? fmt(publicStats.organizations) : "—", t("home.stats.partners")],
+                      [publicStats ? fmt(publicStats.price_observations) : "—", locale === "fr" ? "Relevés prix" : "Price data"],
                     ].map(([value, label]) => (
                       <div key={label} className="rounded-xl border border-gray-100 bg-gray-50 p-3">
                         <div className="text-xl font-black text-faso-navy">{value}</div>
@@ -363,7 +363,7 @@ export default function HomePage() {
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            {categoryMeta.map(({ fr, en, icon, count, color }) => {
+            {categoryMeta.map(({ fr, en, icon, color }) => {
               const name = locale === "fr" ? fr : en;
               return (
                 <Link
@@ -375,9 +375,6 @@ export default function HomePage() {
                     {icon}
                   </div>
                   <div className="font-semibold text-sm">{name}</div>
-                  <div className="text-xs opacity-70 mt-1">
-                    {count} {t("home.datasetsLabel")}
-                  </div>
                 </Link>
               );
             })}

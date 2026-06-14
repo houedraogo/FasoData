@@ -190,3 +190,31 @@ async def test_series_hides_seed_rows_in_production(client, db_session, monkeypa
     points = resp.json()["points"]
     assert len(points) == 1
     assert points[0]["price"] == 300.0
+
+
+@pytest.mark.asyncio
+async def test_latest_hides_seed_rows_even_outside_production(client, db_session):
+    await add_price(db_session, source="wfp", price=999, data_origin="seed")
+    await add_price(db_session, source="wfp", price=300, data_origin="public")
+
+    resp = await client.get("/api/prices/latest?region=Sahel&sources=wfp")
+
+    assert resp.status_code == 200, resp.text
+    rows = resp.json()
+    assert len(rows) == 1
+    assert rows[0]["price"] == 300.0
+    assert rows[0]["data_origin"] == "public"
+
+
+@pytest.mark.asyncio
+async def test_latest_sources_filter_returns_wfp_only(client, db_session):
+    await add_price(db_session, source="wfp", price=300, data_origin="public")
+    await add_price(db_session, source="sms", price=330, status="validated", data_origin="field")
+
+    resp = await client.get("/api/prices/latest?region=Sahel&sources=wfp")
+
+    assert resp.status_code == 200, resp.text
+    rows = resp.json()
+    assert len(rows) == 1
+    assert rows[0]["source"] == "wfp"
+    assert rows[0]["price"] == 300.0

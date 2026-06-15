@@ -353,6 +353,180 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ── Origine des données ── */}
+      <section className="py-20 bg-white border-b border-gray-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+          {/* En-tête */}
+          <div className="text-center mb-14">
+            <span className="inline-block px-4 py-1.5 bg-[#E04E2F]/10 text-[#E04E2F] text-sm font-bold rounded-full mb-4 uppercase tracking-wider">
+              Données de terrain
+            </span>
+            <h2 className="text-3xl lg:text-4xl font-bold text-faso-navy mb-4">
+              Des marchés locaux à votre écran
+            </h2>
+            <p className="text-gray-500 max-w-2xl mx-auto leading-relaxed">
+              Chaque prix affiché sur FasoData commence par un contributeur qui se rend
+              physiquement au marché. Les données ouvertes viennent en complément — jamais
+              en remplacement.
+            </p>
+          </div>
+
+          {/* Pipeline horizontal */}
+          <div className="relative">
+            {/* Ligne de connexion (desktop) */}
+            <div className="hidden lg:block absolute top-[52px] left-[calc(12.5%+24px)] right-[calc(12.5%+24px)] h-0.5 bg-gradient-to-r from-[#E04E2F]/20 via-[#E04E2F]/60 to-green-500/40" />
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-4">
+
+              {/* Étape 1 — Terrain */}
+              <div className="relative flex flex-col items-center text-center">
+                <div className="relative z-10 w-[52px] h-[52px] rounded-2xl bg-[#E04E2F] flex items-center justify-center shadow-lg shadow-[#E04E2F]/30 mb-5">
+                  <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </div>
+                <div className="bg-gray-50 border border-gray-100 rounded-2xl p-5 w-full">
+                  <p className="text-xs font-bold text-[#E04E2F] uppercase tracking-widest mb-2">Étape 1</p>
+                  <h3 className="font-bold text-faso-navy mb-3">Collecte terrain</h3>
+                  <p className="text-sm text-gray-500 mb-4 leading-relaxed">
+                    Un contributeur se rend au marché et relève les prix produit par produit.
+                  </p>
+                  {/* Mini table prix */}
+                  <div className="bg-white border border-gray-100 rounded-xl overflow-hidden text-left">
+                    <div className="px-3 py-2 bg-[#1A2C42] flex justify-between">
+                      <span className="text-[10px] font-bold text-white/60 uppercase">Produit</span>
+                      <span className="text-[10px] font-bold text-white/60 uppercase">Prix/kg</span>
+                    </div>
+                    {[
+                      ["Riz local",  "650 FCFA"],
+                      ["Maïs blanc", "300 FCFA"],
+                      ["Mil",        "400 FCFA"],
+                      ["Sorgho",     "350 FCFA"],
+                    ].map(([p, v]) => (
+                      <div key={p} className="px-3 py-1.5 flex justify-between border-t border-gray-50">
+                        <span className="text-xs text-gray-600">{p}</span>
+                        <span className="text-xs font-bold text-faso-navy">{v}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2 mt-3 text-[11px] text-gray-400">
+                    <span>📷 Photo</span>
+                    <span>·</span>
+                    <span>📍 GPS</span>
+                    <span>·</span>
+                    <span>💬 Commentaire</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Étape 2 — Contrôle automatique */}
+              <div className="relative flex flex-col items-center text-center">
+                <div className="relative z-10 w-[52px] h-[52px] rounded-2xl bg-amber-500 flex items-center justify-center shadow-lg shadow-amber-500/30 mb-5">
+                  <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18" />
+                  </svg>
+                </div>
+                <div className="bg-gray-50 border border-gray-100 rounded-2xl p-5 w-full h-full">
+                  <p className="text-xs font-bold text-amber-500 uppercase tracking-widest mb-2">Étape 2</p>
+                  <h3 className="font-bold text-faso-navy mb-3">Contrôle automatique</h3>
+                  <p className="text-sm text-gray-500 mb-4 leading-relaxed">
+                    L'algorithme détecte les anomalies avant toute publication.
+                  </p>
+                  <div className="space-y-2 text-left">
+                    {[
+                      ["Valeurs aberrantes",    true],
+                      ["Erreurs de saisie",     true],
+                      ["Données incomplètes",   true],
+                      ["Cohérence géographique",true],
+                    ].map(([label, ok]) => (
+                      <div key={label as string} className="flex items-center gap-2.5 bg-white border border-gray-100 rounded-lg px-3 py-2">
+                        <span className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold ${ok ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600"}`}>
+                          {ok ? "✓" : "✗"}
+                        </span>
+                        <span className="text-xs text-gray-600">{label as string}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Étape 3 — Vérification croisée */}
+              <div className="relative flex flex-col items-center text-center">
+                <div className="relative z-10 w-[52px] h-[52px] rounded-2xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-600/30 mb-5">
+                  <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </div>
+                <div className="bg-gray-50 border border-gray-100 rounded-2xl p-5 w-full h-full">
+                  <p className="text-xs font-bold text-blue-600 uppercase tracking-widest mb-2">Étape 3</p>
+                  <h3 className="font-bold text-faso-navy mb-3">Double vérification</h3>
+                  <p className="text-sm text-gray-500 mb-4 leading-relaxed">
+                    Un second contributeur indépendant relève les mêmes prix sur le même marché.
+                  </p>
+                  <div className="bg-white border border-gray-100 rounded-xl p-3 text-left space-y-3">
+                    <div>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Score de confiance</p>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                          <div className="h-full bg-blue-500 rounded-full" style={{ width: "82%" }} />
+                        </div>
+                        <span className="text-sm font-bold text-blue-600">82%</span>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Recoupement données ouvertes</p>
+                      <div className="flex gap-1.5 flex-wrap">
+                        {["WFP/HDX", "SONAGESS", "INSD"].map((src) => (
+                          <span key={src} className="px-2 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-semibold rounded-full border border-blue-100">{src}</span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Étape 4 — Publication */}
+              <div className="relative flex flex-col items-center text-center">
+                <div className="relative z-10 w-[52px] h-[52px] rounded-2xl bg-green-600 flex items-center justify-center shadow-lg shadow-green-600/30 mb-5">
+                  <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div className="bg-green-50 border border-green-100 rounded-2xl p-5 w-full h-full">
+                  <p className="text-xs font-bold text-green-600 uppercase tracking-widest mb-2">Étape 4</p>
+                  <h3 className="font-bold text-faso-navy mb-3">Intégration FasoData</h3>
+                  <p className="text-sm text-gray-500 mb-4 leading-relaxed">
+                    La donnée validée rejoint la base et devient accessible via le catalogue, la carte et l'API.
+                  </p>
+                  <div className="space-y-2 text-left">
+                    {[
+                      ["Catalogue public",   "/datasets"],
+                      ["Carte des prix",     "/carte-prix"],
+                      ["API ouverte",        "/developers"],
+                    ].map(([label, href]) => (
+                      <Link key={href as string} href={href as string}
+                        className="flex items-center justify-between bg-white border border-green-100 rounded-lg px-3 py-2 hover:border-green-300 transition-colors group">
+                        <span className="text-xs font-medium text-gray-700">{label as string}</span>
+                        <ArrowRight className="w-3.5 h-3.5 text-green-500 group-hover:translate-x-0.5 transition-transform" />
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          {/* Note de bas de section */}
+          <p className="text-center text-xs text-gray-400 mt-10">
+            Les données ouvertes (WFP, SONAGESS, INSD, Ministères) complètent les relevés terrain — elles ne les remplacent pas.
+          </p>
+
+        </div>
+      </section>
+
       <PrixDuJourWidget />
 
       <section className="py-16 bg-white">

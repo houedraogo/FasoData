@@ -724,6 +724,7 @@ export default function HomePage() {
                   ["📍", "Vous vous rendez au marché de votre zone"],
                   ["📝", "Vous saisissez les prix sur l'application (ou sur papier)"],
                   ["✅", "Vos données sont vérifiées et publiées sous 24h"],
+                  ["💰", "Chaque relevé validé est rémunéré"],
                   ["🎖️", "Vous gagnez un score de fiabilité et une reconnaissance publique"],
                 ].map(([emoji, text]) => (
                   <div key={text as string} className="flex items-start gap-3">

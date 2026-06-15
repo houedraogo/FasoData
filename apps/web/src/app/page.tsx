@@ -24,6 +24,102 @@ const categoryMeta = [
   { fr: "Environnement", en: "Environment", icon: "Env", color: "bg-teal-50 text-teal-700 border-teal-200" },
 ];
 
+function ContributeurForm() {
+  const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    const nom     = String(fd.get("nom") ?? "").trim();
+    const email   = String(fd.get("email") ?? "").trim();
+    const region  = String(fd.get("region") ?? "").trim();
+    const marche  = String(fd.get("marche") ?? "").trim();
+    const message = String(fd.get("message") ?? "").trim();
+
+    const body = [
+      `Nom : ${nom}`,
+      `Email : ${email}`,
+      `Région : ${region}`,
+      `Marché : ${marche}`,
+      message ? `\nMessage :\n${message}` : "",
+    ].join("\n");
+
+    setLoading(true);
+    setTimeout(() => {
+      window.location.href = `mailto:contact@fasodata.bf?subject=${encodeURIComponent("Candidature contributeur terrain — " + nom)}&body=${encodeURIComponent(body)}`;
+      setSubmitted(true);
+      setLoading(false);
+    }, 300);
+  };
+
+  if (submitted) {
+    return (
+      <div className="bg-white rounded-2xl border border-green-100 shadow-sm p-10 text-center">
+        <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-5">
+          <span className="text-3xl">✅</span>
+        </div>
+        <h3 className="text-xl font-bold text-faso-navy mb-2">Votre candidature est prête !</h3>
+        <p className="text-gray-500 text-sm">
+          Votre client email s'est ouvert avec les informations pré-remplies.<br />
+          Envoyez l'email pour finaliser votre candidature.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-7 space-y-4">
+      <h3 className="text-lg font-bold text-faso-navy mb-1">Formulaire de candidature</h3>
+      <p className="text-sm text-gray-500 mb-4">Remplissez ce formulaire — nous vous contacterons sous 48h.</p>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Nom complet *</label>
+          <input name="nom" type="text" required placeholder="Aïcha Sawadogo"
+            className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-faso-navy/20" />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Email *</label>
+          <input name="email" type="email" required placeholder="vous@example.com"
+            className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-faso-navy/20" />
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Région *</label>
+        <select name="region" required
+          className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-faso-navy/20 bg-white">
+          <option value="">Sélectionnez votre région</option>
+          {["Boucle du Mouhoun","Cascades","Centre","Centre-Est","Centre-Nord","Centre-Ouest","Centre-Sud","Est","Hauts-Bassins","Nord","Plateau-Central","Sahel","Sud-Ouest"].map((r) => (
+            <option key={r} value={r}>{r}</option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Marché concerné *</label>
+        <input name="marche" type="text" required placeholder="Ex : Marché central de Bobo-Dioulasso"
+          className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-faso-navy/20" />
+      </div>
+
+      <div>
+        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Message (optionnel)</label>
+        <textarea name="message" rows={3} placeholder="Parlez-nous de votre expérience ou motivation..."
+          className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-faso-navy/20 resize-none" />
+      </div>
+
+      <button type="submit" disabled={loading}
+        className="w-full py-3 bg-[#E04E2F] hover:bg-[#c73e22] text-white font-semibold rounded-xl text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-60">
+        {loading ? "Préparation…" : "Envoyer ma candidature →"}
+      </button>
+      <p className="text-xs text-gray-400 text-center">
+        Votre client email s'ouvrira pour l'envoi final.
+      </p>
+    </form>
+  );
+}
+
 export default function HomePage() {
   const { locale, t } = useLanguage();
   const [publicStats, setPublicStats] = useState<PublicStats | null>(null);
@@ -600,6 +696,46 @@ export default function HomePage() {
                 <p className="text-sm text-gray-500 leading-relaxed">{description}</p>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Formulaire contributeur terrain ── */}
+      <section className="py-20 bg-faso-navy/5 border-t border-gray-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-14 items-center">
+
+            {/* Texte gauche */}
+            <div>
+              <span className="inline-block px-4 py-1.5 bg-[#E04E2F]/10 text-[#E04E2F] text-sm font-bold rounded-full mb-5 uppercase tracking-wider">
+                Devenir contributeur
+              </span>
+              <h2 className="text-3xl lg:text-4xl font-bold text-faso-navy mb-5 leading-tight">
+                Vous connaissez un marché local ?<br />
+                <span className="text-[#E04E2F]">Rejoignez le réseau terrain.</span>
+              </h2>
+              <p className="text-gray-600 leading-relaxed mb-6">
+                Les contributeurs FasoData relèvent les prix dans les marchés de leur région,
+                prennent des photos et transmettent leurs données via l'application mobile.
+                Chaque relevé, une fois validé, alimente la carte nationale et le catalogue ouvert.
+              </p>
+              <div className="space-y-3">
+                {[
+                  ["📍", "Vous vous rendez au marché de votre zone"],
+                  ["📝", "Vous saisissez les prix sur l'application (ou sur papier)"],
+                  ["✅", "Vos données sont vérifiées et publiées sous 24h"],
+                  ["🎖️", "Vous gagnez un score de fiabilité et une reconnaissance publique"],
+                ].map(([emoji, text]) => (
+                  <div key={text as string} className="flex items-start gap-3">
+                    <span className="text-lg leading-tight mt-0.5">{emoji as string}</span>
+                    <p className="text-sm text-gray-600 leading-relaxed">{text as string}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Formulaire droite */}
+            <ContributeurForm />
           </div>
         </div>
       </section>

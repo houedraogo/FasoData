@@ -64,23 +64,7 @@ export default function AProposPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-white">
-
-      {/* Navbar simple */}
-      <nav className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-gray-100">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 font-bold text-faso-navy text-lg">
-            <div className="w-8 h-8 bg-faso-navy rounded-lg flex items-center justify-center">
-              <Database className="w-4 h-4 text-white" />
-            </div>
-            Faso<span className="font-light">Data</span>
-          </Link>
-          <div className="flex items-center gap-4 text-sm">
-            <Link href="/datasets" className="text-gray-500 hover:text-faso-navy transition-colors">Datasets</Link>
-            <Link href="/auth/connexion" className="btn-primary text-sm py-2 px-4">{t("about.nav.login")}</Link>
-          </div>
-        </div>
-      </nav>
+    <div className="bg-white">
 
       {/* Hero */}
       <section className="bg-faso-navy relative overflow-hidden">
@@ -256,14 +240,6 @@ export default function AProposPage() {
         </div>
       </section>
 
-      {/* Footer minimal */}
-      <footer className="py-6 border-t border-gray-100 text-center text-xs text-gray-400">
-        © {new Date().getFullYear()} FasoData — {t("about.footer")}
-        <span className="mx-2">·</span>
-        <Link href="/datasets" className="hover:text-faso-navy transition-colors">Datasets</Link>
-        <span className="mx-2">·</span>
-        <Link href="/carte" className="hover:text-faso-navy transition-colors">Carte</Link>
-      </footer>
     </div>
   );
 }

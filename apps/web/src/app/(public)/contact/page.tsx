@@ -24,21 +24,7 @@ export default function ContactPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white">
-      <nav className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-gray-100">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 font-bold text-faso-navy text-lg">
-            <div className="w-8 h-8 bg-faso-navy rounded-lg flex items-center justify-center">
-              <Database className="w-4 h-4 text-white" />
-            </div>
-            Faso<span className="font-light">Data</span>
-          </Link>
-          <Link href="/datasets" className="text-sm text-gray-500 hover:text-faso-navy transition-colors">
-            Explorer les données
-          </Link>
-        </div>
-      </nav>
-
+    <div className="bg-white">
       <section className="bg-faso-navy py-20">
         <div className="max-w-5xl mx-auto px-4 text-center">
           <h1 className="text-4xl font-bold text-white mb-4">Contactez-nous</h1>
@@ -130,12 +116,6 @@ export default function ContactPage() {
         </div>
       </section>
 
-      <footer className="py-6 border-t border-gray-100 text-center text-xs text-gray-400">
-        © {new Date().getFullYear()} FasoData ·{" "}
-        <Link href="/" className="hover:text-faso-navy transition-colors">Accueil</Link>
-        {" · "}
-        <Link href="/a-propos" className="hover:text-faso-navy transition-colors">À propos</Link>
-      </footer>
     </div>
   );
 }

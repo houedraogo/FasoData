@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   Users, Globe, Database, TrendingUp, Shield,
   FileText, Settings, LogOut, ChevronRight, Mail,
-  BookOpen, BarChart3,
+  BarChart3,
 } from "lucide-react";
 import { AuthGate } from "@/components/auth/AuthGate";
 import { useAuth } from "@/hooks/useAuth";
@@ -23,7 +23,6 @@ const NAV_ITEMS = [
   { href: "/admin/supervision",   icon: TrendingUp,label: "Supervision" },
   { href: "/admin/securite",      icon: Shield,    label: "Sécurité" },
   { href: "/admin/logs",          icon: FileText,  label: "Journaux" },
-  { href: "/guide",               icon: BookOpen,  label: "Guide", external: true },
   { href: "/admin/parametres",    icon: Settings,  label: "Réglages" },
 ];
 
@@ -62,13 +61,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* Nav */}
         <nav className="flex-1 px-2.5 space-y-0.5">
-          {NAV_ITEMS.map(({ href, icon: Icon, label, external }) => {
+          {NAV_ITEMS.map(({ href, icon: Icon, label }) => {
             const active = pathname === href || pathname.startsWith(href + "/");
             return (
               <Link
                 key={href}
                 href={href}
-                {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
                 className={cn(
                   "flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all",
                   active

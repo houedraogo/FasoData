@@ -1,26 +1,36 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Database, Mail, MapPin } from "lucide-react";
+import { ArrowRight, Mail, MapPin } from "lucide-react";
 
 export default function ContactPage() {
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const [loading, setLoading] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    const firstName = String(formData.get("firstName") ?? "").trim();
-    const lastName = String(formData.get("lastName") ?? "").trim();
-    const email = String(formData.get("email") ?? "").trim();
-    const subject = String(formData.get("subject") ?? "Demande FasoData").trim();
-    const message = String(formData.get("message") ?? "").trim();
-
-    const body = [
-      `Nom: ${firstName} ${lastName}`.trim(),
-      `Email: ${email}`,
-      "",
-      message,
-    ].join("\n");
-
-    window.location.href = `mailto:contact@fasodata.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    const fd = new FormData(event.currentTarget);
+    setLoading(true);
+    try {
+      const res = await fetch("/api/contact/message", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          firstName: String(fd.get("firstName") ?? "").trim(),
+          lastName:  String(fd.get("lastName") ?? "").trim(),
+          email:     String(fd.get("email") ?? "").trim(),
+          subject:   String(fd.get("subject") ?? "Demande FasoData").trim(),
+          message:   String(fd.get("message") ?? "").trim(),
+        }),
+      });
+      if (!res.ok) throw new Error();
+      setSubmitted(true);
+    } catch {
+      alert("Une erreur est survenue. Veuillez réessayer ou écrire à contact@fasodata.com");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -74,6 +84,13 @@ export default function ContactPage() {
             </div>
           </div>
 
+          {submitted ? (
+            <div className="bg-green-50 border border-green-100 rounded-2xl p-10 text-center flex flex-col items-center justify-center min-h-[300px]">
+              <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center mb-5 text-3xl">✅</div>
+              <h3 className="text-xl font-bold text-faso-navy mb-2">Message envoyé !</h3>
+              <p className="text-gray-500 text-sm max-w-xs">Notre équipe vous répondra sous 48h à l'adresse indiquée.</p>
+            </div>
+          ) : (
           <form onSubmit={handleSubmit} className="bg-gray-50 rounded-2xl p-8 space-y-4">
             <h2 className="text-xl font-bold text-gray-900 mb-6">Envoyer un message</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -105,14 +122,12 @@ export default function ContactPage() {
               <textarea name="message" required rows={5} placeholder="Décrivez votre demande..."
                 className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-faso-navy/20 resize-none" />
             </div>
-            <button type="submit" className="w-full py-3 bg-faso-navy hover:bg-faso-navy/90 text-white font-semibold rounded-xl text-sm transition-colors flex items-center justify-center gap-2">
+            <button type="submit" disabled={loading} className="w-full py-3 bg-faso-navy hover:bg-faso-navy/90 text-white font-semibold rounded-xl text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-60">
               <Mail className="w-4 h-4" />
-              Préparer l'email
+              {loading ? "Envoi en cours…" : "Envoyer le message"}
             </button>
-            <p className="text-xs text-gray-400 text-center">
-              L'envoi final se fait depuis votre client email.
-            </p>
           </form>
+          )}
         </div>
       </section>
 

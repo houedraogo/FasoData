@@ -25,7 +25,7 @@ const NAV_ITEMS = [
   { href: "/dashboard/rapports",   icon: FileText,        label: "Rapports" },
   { href: "/dashboard/alertes",    icon: Bell,            label: "Alertes", badge: 3 },
   { href: "/dashboard/equipe",     icon: Users,           label: "Équipe" },
-  { href: "/guide",                icon: BookOpen,        label: "Guide", external: true },
+  { href: "/guide",                icon: BookOpen,        label: "Guide" },
   { href: "/dashboard/profil",     icon: Settings,        label: "Paramètres" },
 ];
 
@@ -99,11 +99,10 @@ export default function InstitutionalLayout({ children }: { children: React.Reac
         </div>
 
         <nav className="flex-1 px-2.5 space-y-0.5 overflow-y-auto">
-          {NAV_ITEMS.map(({ href, icon: Icon, label, badge, external }) => {
+          {NAV_ITEMS.map(({ href, icon: Icon, label, badge }) => {
             const active = pathname === href || (href !== "/dashboard" && pathname.startsWith(href + "/"));
             return (
               <Link key={href} href={href}
-                {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
                 className={cn(
                   "flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all",
                   active ? "bg-white/12 text-white" : "text-white/55 hover:text-white/85 hover:bg-white/8"
@@ -182,11 +181,10 @@ export default function InstitutionalLayout({ children }: { children: React.Reac
             <p className="px-5 pb-2 text-[10px] font-semibold text-white/30 uppercase tracking-widest">Navigation</p>
 
             <nav className="flex-1 px-2.5 space-y-0.5 overflow-y-auto">
-              {NAV_ITEMS.map(({ href, icon: Icon, label, badge, external }) => {
+              {NAV_ITEMS.map(({ href, icon: Icon, label, badge }) => {
                 const active = pathname === href || (href !== "/dashboard" && pathname.startsWith(href + "/"));
                 return (
                   <Link key={href} href={href}
-                    {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
                     onClick={() => setDrawerOpen(false)}
                     className={cn(
                       "flex items-center justify-between px-3 py-3 rounded-xl text-sm font-medium transition-all",

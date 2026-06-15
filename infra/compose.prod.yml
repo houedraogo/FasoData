@@ -28,7 +28,7 @@ services:
       dockerfile: infra/docker/Dockerfile.web.prod
       args:
         NEXT_PUBLIC_API_URL: /api
-        NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
+        NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-652998119352-15h4dcof3tujdtft0ceckk8bvllkqirt.apps.googleusercontent.com}
     env_file:
       - ../.env.production
     environment:

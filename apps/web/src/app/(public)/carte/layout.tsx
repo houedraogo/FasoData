@@ -8,7 +8,7 @@ export const metadata: Metadata = {
     title: "Carte interactive — FasoData",
     description:
       "Carte des données géospatiales du Burkina Faso : régions, provinces et indicateurs thématiques.",
-    url: "https://fasodata.bf/carte",
+    url: "https://fasodata.com/carte",
     siteName: "FasoData",
     type: "website",
   },

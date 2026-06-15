@@ -40,7 +40,7 @@ type OpenApiSchema = {
   paths?: Record<string, Record<string, OpenApiOperation>>;
 };
 
-const BASE_URL = "https://api.fasodata.bf";
+const BASE_URL = "https://api.fasodata.com";
 
 const QUICK_START: Record<Lang, string> = {
   curl: `curl -X POST "${BASE_URL}/api/auth/login" \\

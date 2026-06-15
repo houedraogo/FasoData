@@ -20,7 +20,7 @@ export default function ContactPage() {
       message,
     ].join("\n");
 
-    window.location.href = `mailto:contact@fasodata.bf?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.location.href = `mailto:contact@fasodata.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   };
 
   return (
@@ -40,9 +40,9 @@ export default function ContactPage() {
             <h2 className="text-2xl font-bold text-faso-navy">Informations de contact</h2>
 
             {[
-              { icon: Mail, label: "Email général", value: "contact@fasodata.bf", href: "mailto:contact@fasodata.bf" },
-              { icon: Mail, label: "Support technique", value: "support@fasodata.bf", href: "mailto:support@fasodata.bf" },
-              { icon: Mail, label: "Partenariats", value: "partenariats@fasodata.bf", href: "mailto:partenariats@fasodata.bf" },
+              { icon: Mail, label: "Email général", value: "contact@fasodata.com", href: "mailto:contact@fasodata.com" },
+              { icon: Mail, label: "Support technique", value: "support@fasodata.com", href: "mailto:support@fasodata.com" },
+              { icon: Mail, label: "Partenariats", value: "partenariats@fasodata.com", href: "mailto:partenariats@fasodata.com" },
               { icon: MapPin, label: "Adresse", value: "Ouagadougou, Burkina Faso", href: null },
             ].map(({ icon: Icon, label, value, href }) => (
               <div key={label} className="flex items-start gap-4">

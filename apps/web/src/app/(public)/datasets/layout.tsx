@@ -8,7 +8,7 @@ export const metadata: Metadata = {
     title: "Catalogue de données — FasoData",
     description:
       "Datasets ouverts du Burkina Faso : agriculture, santé, éducation, économie et plus. Téléchargement libre, API disponible.",
-    url: "https://fasodata.bf/datasets",
+    url: "https://fasodata.com/datasets",
     siteName: "FasoData",
     type: "website",
   },

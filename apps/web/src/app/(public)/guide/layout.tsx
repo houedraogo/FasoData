@@ -8,7 +8,7 @@ export const metadata: Metadata = {
     title: "Guide d'utilisation — FasoData",
     description:
       "Guide complet pour utiliser FasoData : recherche, téléchargement, API et publication de données ouvertes.",
-    url: "https://fasodata.bf/guide",
+    url: "https://fasodata.com/guide",
     siteName: "FasoData",
     type: "website",
   },

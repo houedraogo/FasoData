@@ -34,7 +34,7 @@ const DEFAULT_SETTINGS: PlatformSettings = {
   platform: {
     name: "FasoData",
     tagline: "Plateforme de données ouvertes du Burkina Faso",
-    contactEmail: "contact@fasodata.bf",
+    contactEmail: "contact@fasodata.com",
     maxFileSize: "100",
     defaultPageSize: "20",
   },

@@ -8,7 +8,7 @@ export const metadata: Metadata = {
     title: "API Développeurs — FasoData",
     description:
       "API REST pour accéder aux données ouvertes du Burkina Faso. Auth JWT, pagination, filtres, formats JSON/CSV.",
-    url: "https://fasodata.bf/developers",
+    url: "https://fasodata.com/developers",
     siteName: "FasoData",
     type: "website",
   },

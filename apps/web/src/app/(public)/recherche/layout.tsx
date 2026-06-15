@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Recherche — FasoData",
     description: "Recherche avancée dans les données ouvertes du Burkina Faso.",
-    url: "https://fasodata.bf/recherche",
+    url: "https://fasodata.com/recherche",
     siteName: "FasoData",
     type: "website",
   },

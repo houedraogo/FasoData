@@ -8,7 +8,7 @@ export const metadata: Metadata = {
     title: "À propos — FasoData",
     description:
       "Découvrez FasoData : mission, équipe et engagement pour les données ouvertes du Burkina Faso.",
-    url: "https://fasodata.bf/a-propos",
+    url: "https://fasodata.com/a-propos",
     siteName: "FasoData",
     type: "website",
   },

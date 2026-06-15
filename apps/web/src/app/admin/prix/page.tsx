@@ -134,7 +134,7 @@ export default function AdminPrixPage() {
   };
 
   const copyUrl = () => {
-    navigator.clipboard.writeText(`https://fasodata.bf${atStatus?.webhook_url ?? ""}`);
+    navigator.clipboard.writeText(`https://fasodata.com${atStatus?.webhook_url ?? ""}`);
     toast.success("URL copiée !");
   };
 
@@ -574,7 +574,7 @@ export default function AdminPrixPage() {
                 {/* Webhook URL */}
                 <div className="flex items-center gap-2 bg-gray-50 rounded-lg border border-gray-200 px-3 py-2">
                   <code className="text-xs text-gray-600 flex-1 truncate">
-                    https://fasodata.bf{atStatus?.webhook_url}
+                    https://fasodata.com{atStatus?.webhook_url}
                   </code>
                   <button onClick={copyUrl} className="p-1 text-gray-400 hover:text-[#1A2C42] shrink-0" aria-label="Copier l'URL webhook">
                     <Copy className="w-3.5 h-3.5" />

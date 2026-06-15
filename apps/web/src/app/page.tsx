@@ -47,7 +47,7 @@ function ContributeurForm() {
 
     setLoading(true);
     setTimeout(() => {
-      window.location.href = `mailto:contact@fasodata.bf?subject=${encodeURIComponent("Candidature contributeur terrain — " + nom)}&body=${encodeURIComponent(body)}`;
+      window.location.href = `mailto:contact@fasodata.com?subject=${encodeURIComponent("Candidature contributeur terrain — " + nom)}&body=${encodeURIComponent(body)}`;
       setSubmitted(true);
       setLoading(false);
     }, 300);

@@ -95,8 +95,8 @@ export default function ConditionsPage() {
         <Section title="7. Contact">
           <p>
             Pour toute question relative aux présentes conditions, contactez-nous à{" "}
-            <a href="mailto:legal@fasodata.bf" className="text-faso-red hover:underline">
-              legal@fasodata.bf
+            <a href="mailto:legal@fasodata.com" className="text-faso-red hover:underline">
+              legal@fasodata.com
             </a>
           </p>
         </Section>

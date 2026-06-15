@@ -8,7 +8,7 @@ export const metadata: Metadata = {
     title: "Carte des prix alimentaires — FasoData",
     description:
       "Prix des céréales et denrées alimentaires par région au Burkina Faso, données WFP/SONAGESS.",
-    url: "https://fasodata.bf/carte-prix",
+    url: "https://fasodata.com/carte-prix",
     siteName: "FasoData",
     type: "website",
   },

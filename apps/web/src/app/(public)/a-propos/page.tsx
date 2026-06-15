@@ -230,7 +230,7 @@ export default function AProposPage() {
               {t("about.ctaCreateAccount")}
             </Link>
             <a
-              href="mailto:contact@fasodata.bf"
+              href="mailto:contact@fasodata.com"
               className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl border border-white/20 text-white hover:bg-white/10 transition-colors text-sm font-medium"
             >
               <Mail className="w-4 h-4" />

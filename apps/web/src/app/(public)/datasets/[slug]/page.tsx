@@ -46,7 +46,7 @@ export async function generateMetadata({
     openGraph: {
       title: `${title} — FasoData`,
       description,
-      url: `https://fasodata.bf/datasets/${slug}`,
+      url: `https://fasodata.com/datasets/${slug}`,
       siteName: "FasoData",
       type: "website",
     },

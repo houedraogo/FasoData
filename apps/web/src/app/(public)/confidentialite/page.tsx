@@ -89,8 +89,8 @@ export default function ConfidentialitePage() {
           </ul>
           <p>
             Pour exercer ces droits, contactez-nous à{" "}
-            <a href="mailto:privacy@fasodata.bf" className="text-faso-red hover:underline">
-              privacy@fasodata.bf
+            <a href="mailto:privacy@fasodata.com" className="text-faso-red hover:underline">
+              privacy@fasodata.com
             </a>
           </p>
         </Section>
@@ -106,8 +106,8 @@ export default function ConfidentialitePage() {
           <p>
             Pour toute question relative à la protection de vos données, contactez notre Délégué
             à la Protection des Données à{" "}
-            <a href="mailto:dpo@fasodata.bf" className="text-faso-red hover:underline">
-              dpo@fasodata.bf
+            <a href="mailto:dpo@fasodata.com" className="text-faso-red hover:underline">
+              dpo@fasodata.com
             </a>
           </p>
         </Section>

@@ -28,29 +28,29 @@ function ContributeurForm() {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
-    const nom     = String(fd.get("nom") ?? "").trim();
-    const email   = String(fd.get("email") ?? "").trim();
-    const region  = String(fd.get("region") ?? "").trim();
-    const marche  = String(fd.get("marche") ?? "").trim();
-    const message = String(fd.get("message") ?? "").trim();
-
-    const body = [
-      `Nom : ${nom}`,
-      `Email : ${email}`,
-      `Région : ${region}`,
-      `Marché : ${marche}`,
-      message ? `\nMessage :\n${message}` : "",
-    ].join("\n");
-
     setLoading(true);
-    setTimeout(() => {
-      window.location.href = `mailto:contact@fasodata.com?subject=${encodeURIComponent("Candidature contributeur terrain — " + nom)}&body=${encodeURIComponent(body)}`;
+    try {
+      const res = await fetch("/api/contact/contributeur", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nom:     String(fd.get("nom") ?? "").trim(),
+          email:   String(fd.get("email") ?? "").trim(),
+          region:  String(fd.get("region") ?? "").trim(),
+          marche:  String(fd.get("marche") ?? "").trim(),
+          message: String(fd.get("message") ?? "").trim(),
+        }),
+      });
+      if (!res.ok) throw new Error();
       setSubmitted(true);
+    } catch {
+      alert("Une erreur est survenue. Veuillez réessayer ou écrire à contact@fasodata.com");
+    } finally {
       setLoading(false);
-    }, 300);
+    }
   };
 
   if (submitted) {

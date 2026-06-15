@@ -20,6 +20,7 @@ from fasodata.prices import at_service
 from fasodata.reports.router import router as reports_router
 from fasodata.search.router import router as search_router
 from fasodata.users.router import router as users_router
+from fasodata.contact.router import router as contact_router
 
 logger   = logging.getLogger(__name__)
 settings = get_settings()
@@ -94,6 +95,7 @@ app.include_router(geo_router)
 app.include_router(alerts_router)
 app.include_router(prices_router)
 app.include_router(reports_router)
+app.include_router(contact_router)
 
 
 @app.get("/api/health")

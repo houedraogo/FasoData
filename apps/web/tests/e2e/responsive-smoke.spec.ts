@@ -7,8 +7,8 @@ const adminEmail = process.env.E2E_ADMIN_EMAIL;
 const adminPassword = process.env.E2E_ADMIN_PASSWORD;
 
 const PUBLIC_PATHS = ["/", "/datasets", "/carte", "/developers"];
-const DASHBOARD_DENSE_PATHS = ["/dashboard/prix", "/dashboard/validation", "/dashboard/analyse"];
-const ADMIN_DENSE_PATHS = ["/admin/prix", "/admin/supervision"];
+const DASHBOARD_DENSE_PATHS = ["/dashboard/prix", "/dashboard/validation", "/dashboard/analyse", "/dashboard/profil"];
+const ADMIN_DENSE_PATHS = ["/admin/utilisateurs", "/admin/prix", "/admin/supervision", "/admin/demandes-acces"];
 
 async function expectNoHorizontalOverflow(page: import("@playwright/test").Page) {
   const overflow = await page.evaluate(() => ({

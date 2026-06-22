@@ -78,7 +78,7 @@ export default function ContactPage() {
                 Rejoignez la plateforme et partagez vos données avec des milliers d'utilisateurs au Burkina Faso.
               </p>
               <Link href="/auth/inscription" className="inline-flex items-center gap-2 px-5 py-2.5 bg-faso-red text-white rounded-xl text-sm font-semibold hover:bg-faso-red/90 transition-colors">
-                Créer un compte institutionnel
+                Demander un accès contributeur
                 <ArrowRight className="w-4 h-4" />
               </Link>
             </div>

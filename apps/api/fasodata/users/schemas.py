@@ -3,7 +3,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, EmailStr
 
-from fasodata.users.models import UserRole
+from fasodata.users.models import AccessRequestStatus, UserRole
 
 
 class UserBase(BaseModel):
@@ -14,7 +14,7 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     password: str
-    role: UserRole = UserRole.public
+    role: UserRole = UserRole.institutional
 
 
 class UserUpdate(BaseModel):
@@ -46,3 +46,31 @@ class UserOutList(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+class AccessRequestOut(BaseModel):
+    id: uuid.UUID
+    email: EmailStr
+    full_name: str | None = None
+    organization: str
+    role: UserRole
+    status: AccessRequestStatus
+    reviewed_by_id: uuid.UUID | None = None
+    reviewed_at: datetime | None = None
+    review_note: str | None = None
+    created_user_id: uuid.UUID | None = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class AccessRequestListOut(BaseModel):
+    items: list[AccessRequestOut]
+    total: int
+    page: int
+    page_size: int
+
+
+class AccessRequestReview(BaseModel):
+    note: str | None = None

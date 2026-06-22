@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { setAuthTokens } from "@/lib/auth-storage";
 import toast from "react-hot-toast";
+import axios from "axios";
 
 const CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";
 
@@ -59,8 +60,9 @@ export function GoogleButton({ onSuccess }: { onSuccess?: () => void }) {
       } else {
         router.replace(next && !next.startsWith("/admin") && !next.startsWith("/dashboard") ? next : "/datasets");
       }
-    } catch {
-      toast.error("Connexion Google échouée. Réessayez.");
+    } catch (error) {
+      const detail = axios.isAxiosError(error) ? error.response?.data?.detail : undefined;
+      toast.error(typeof detail === "string" ? detail : "Connexion Google échouée. Réessayez.");
     } finally {
       setLoading(false);
     }

@@ -20,6 +20,8 @@ from dataclasses import dataclass
 from urllib.parse import urlsplit, urlunsplit
 
 import psycopg2
+from alembic.config import Config
+from alembic.script import ScriptDirectory
 
 
 REQUIRED_TABLES = {
@@ -32,6 +34,8 @@ REQUIRED_TABLES = {
     "program_price_alerts",
     "dashboard_preferences",
     "platform_settings",
+    "page_views",
+    "access_requests",
     "alembic_version",
 }
 
@@ -111,13 +115,25 @@ def _run_alembic(urls: DbUrls) -> None:
     subprocess.run(["alembic", "-c", "alembic.ini", "upgrade", "head"], check=True, env=env)
 
 
+def _expected_head() -> str:
+    config = Config("alembic.ini")
+    script = ScriptDirectory.from_config(config)
+    heads = script.get_heads()
+    if len(heads) != 1:
+        raise RuntimeError(f"Expected exactly one Alembic head, found: {', '.join(heads)}")
+    return heads[0]
+
+
 def _verify_schema(urls: DbUrls) -> None:
+    expected_head = _expected_head()
     with _connect(urls.smoke_sync_url) as conn:
         with conn.cursor() as cur:
             cur.execute("SELECT version_num FROM alembic_version")
             version = cur.fetchone()[0]
-            if version != "0003":
-                raise RuntimeError(f"Unexpected Alembic version: {version}")
+            if version != expected_head:
+                raise RuntimeError(
+                    f"Unexpected Alembic version: {version}; expected {expected_head}"
+                )
 
             cur.execute("SELECT tablename FROM pg_tables WHERE schemaname = 'public'")
             tables = {row[0] for row in cur.fetchall()}

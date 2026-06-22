@@ -7,63 +7,200 @@ import OfflineIndicator from "@/components/pwa/OfflineIndicator";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://fasodata.com";
 const siteDescription =
-  "Explorez les donnees fiables du Burkina Faso : prix alimentaires, cartes regionales, datasets publics, indicateurs d'impact et API pour chercheurs, ONG, entreprises et institutions.";
+  "FasoData — plateforme open data de référence au Burkina Faso. Prix alimentaires en temps réel, datasets publics vérifiés, carte des marchés, indicateurs d'impact pour ONG, entreprises, investisseurs et institutions.";
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": `${siteUrl}/#organization`,
+      name: "FasoData",
+      url: siteUrl,
+      logo: {
+        "@type": "ImageObject",
+        url: `${siteUrl}/icons/icon.svg`,
+      },
+      description: siteDescription,
+      foundingLocation: {
+        "@type": "Place",
+        name: "Burkina Faso",
+      },
+      areaServed: {
+        "@type": "Country",
+        name: "Burkina Faso",
+      },
+      knowsAbout: [
+        "Open Data",
+        "Prix alimentaires Burkina Faso",
+        "Données agricoles Afrique de l'Ouest",
+        "Étude de marché Burkina Faso",
+        "Indicateurs socioéconomiques",
+      ],
+    },
+    {
+      "@type": "WebSite",
+      "@id": `${siteUrl}/#website`,
+      url: siteUrl,
+      name: "FasoData",
+      publisher: { "@id": `${siteUrl}/#organization` },
+      inLanguage: ["fr", "en"],
+      potentialAction: {
+        "@type": "SearchAction",
+        target: {
+          "@type": "EntryPoint",
+          urlTemplate: `${siteUrl}/recherche?q={search_term_string}`,
+        },
+        "query-input": "required name=search_term_string",
+      },
+    },
+    {
+      "@type": "DataCatalog",
+      "@id": `${siteUrl}/#datacatalog`,
+      name: "Catalogue de données FasoData",
+      url: `${siteUrl}/datasets`,
+      description:
+        "Catalogue de datasets ouverts sur le Burkina Faso : agriculture, prix alimentaires, santé, éducation, économie, géographie.",
+      publisher: { "@id": `${siteUrl}/#organization` },
+      spatialCoverage: {
+        "@type": "Country",
+        name: "Burkina Faso",
+        identifier: "BF",
+      },
+      keywords: [
+        "prix alimentaires Burkina Faso",
+        "données sorgho maïs mil",
+        "marchés alimentaires Sahel",
+        "open data Afrique de l'Ouest",
+      ],
+    },
+  ],
+};
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   applicationName: "FasoData",
   title: {
-    default: "FasoData - Donnees fiables sur le Burkina Faso",
+    default: "FasoData — Open Data & Prix Alimentaires Burkina Faso",
     template: "%s | FasoData",
   },
   description: siteDescription,
   keywords: [
+    // Marque
     "FasoData",
+    // Géographie
     "Burkina Faso",
-    "donnees ouvertes",
+    "Ouagadougou",
+    "Bobo-Dioulasso",
+    "Sahel Burkina Faso",
+    "Afrique de l'Ouest",
+    "UEMOA",
+    "CEDEAO",
+    // Open data
+    "données ouvertes",
     "open data Burkina Faso",
-    "prix alimentaires",
-    "WFP",
-    "cartographie",
-    "datasets publics",
-    "indicateurs ONG",
-    "etude de marche",
+    "données publiques Burkina Faso",
+    "datasets Burkina Faso",
+    "données gratuites Burkina",
+    "API données Burkina Faso",
+    // Prix alimentaires
+    "prix alimentaires Burkina Faso",
+    "prix céréales Burkina Faso",
+    "prix sorgho Burkina Faso",
+    "prix maïs Burkina Faso",
+    "prix mil Burkina Faso",
+    "prix riz Burkina Faso",
+    "prix niébé Burkina Faso",
+    "prix arachide Burkina Faso",
+    "prix marchés Ouagadougou",
+    "prix marchés Bobo-Dioulasso",
+    "sécurité alimentaire Burkina Faso",
+    "marché alimentaire Sahel",
+    "inflation alimentaire Burkina",
+    // Organisations & sources
+    "WFP Burkina Faso",
+    "PAM Burkina Faso",
+    "SONAGESS",
+    "INSD Burkina Faso",
+    "données WFP HDX",
+    "humanitarian data exchange",
+    // Études de marché / entreprises
+    "étude de marché Burkina Faso",
+    "analyse marché agroalimentaire",
+    "import export Burkina Faso",
+    "investissement agricole Burkina Faso",
+    "filière céréales Burkina Faso",
+    "distribution alimentaire Burkina Faso",
+    // ONG & institutions
+    "données ONG Burkina Faso",
+    "indicateurs impact social",
+    "monitoring évaluation ONG",
+    "données humanitaires Burkina",
+    "cartographie projets ONG",
+    // Secteurs
+    "agriculture Burkina Faso",
+    "santé Burkina Faso",
+    "éducation Burkina Faso",
+    "économie Burkina Faso",
+    "géographie Burkina Faso",
+    // Technique
+    "API REST Burkina Faso",
+    "données CSV Excel Burkina Faso",
+    "cartographie données Burkina",
+    "visualisation données Afrique",
+    "tableau de bord ONG",
   ],
-  authors: [{ name: "FasoData" }],
+  authors: [{ name: "FasoData", url: siteUrl }],
   creator: "FasoData",
   publisher: "FasoData",
+  category: "données ouvertes, agriculture, économie",
+  classification: "Open Data Platform",
   alternates: {
     canonical: "/",
     languages: {
-      fr: "/",
-      en: "/?lang=en",
+      "fr-BF": "/",
+      "fr": "/",
+      "en": "/?lang=en",
     },
   },
   openGraph: {
-    title: "FasoData - Donnees fiables sur le Burkina Faso",
+    title: "FasoData — Open Data & Prix Alimentaires Burkina Faso",
     description: siteDescription,
     url: siteUrl,
     siteName: "FasoData",
     locale: "fr_BF",
+    alternateLocale: ["fr_FR", "en_US"],
     type: "website",
     images: [
       {
-        url: "/opengraph-image",
+        url: "/opengraph-image.png",
         width: 1200,
         height: 630,
-        alt: "Apercu de la plateforme FasoData",
+        alt: "FasoData — Plateforme open data Burkina Faso : prix alimentaires, datasets et carte des marchés",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "FasoData - Donnees fiables sur le Burkina Faso",
+    title: "FasoData — Open Data & Prix Alimentaires Burkina Faso",
     description: siteDescription,
-    images: ["/opengraph-image"],
+    images: ["/opengraph-image.png"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
   },
   icons: {
     icon: [
       { url: "/picto.png", type: "image/png" },
+      { url: "/icons/icon.svg", type: "image/svg+xml" },
     ],
     apple: "/picto.png",
   },
@@ -95,6 +232,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
       </head>
       <body>
         <Providers>

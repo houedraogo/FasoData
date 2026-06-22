@@ -1,6 +1,9 @@
-"""Tests des endpoints datasets."""
+﻿"""Tests des endpoints datasets."""
 
 import pytest
+
+from fasodata.core.security import hash_password
+from fasodata.users.models import User, UserRole
 
 
 @pytest.mark.asyncio
@@ -26,7 +29,7 @@ class TestListDatasets:
         assert resp.status_code == 200
 
     async def test_list_search_query(self, client):
-        resp = await client.get("/api/datasets?q=céréales")
+        resp = await client.get("/api/datasets?q=cÃ©rÃ©ales")
         assert resp.status_code == 200
 
     async def test_list_invalid_page(self, client):
@@ -47,7 +50,7 @@ class TestCreateDataset:
             "/api/datasets",
             json={
                 "name": "Dataset test ONG",
-                "description": "Données test pour pytest",
+                "description": "DonnÃ©es test pour pytest",
                 "license": "open",
                 "category": "Agriculture",
                 "tags": ["test", "pytest"],
@@ -63,19 +66,22 @@ class TestCreateDataset:
     async def test_create_slug_generated(self, client, institutional_token):
         resp = await client.post(
             "/api/datasets",
-            json={"name": "Prix des céréales 2024", "license": "open"},
+            json={"name": "Prix des cereales 2024", "license": "open"},
             headers={"Authorization": f"Bearer {institutional_token}"},
         )
         assert resp.status_code == 201
         assert resp.json()["slug"] == "prix-des-cereales-2024"
 
-    async def test_create_public_forbidden(self, client):
-        # Créer un utilisateur public et obtenir son token
-        await client.post("/api/auth/register", json={
-            "email": "public_ds@test.bf",
-            "password": "Public123!",
-            "role": "public",
-        })
+    async def test_create_public_forbidden(self, client, db_session):
+        # Creer directement un ancien lecteur pour verifier le garde institutionnel.
+        db_session.add(User(
+            email="public_ds@test.bf",
+            hashed_password=hash_password("Public123!"),
+            full_name="Public DS",
+            role=UserRole.public,
+            is_active=True,
+        ))
+        await db_session.commit()
         login = await client.post(
             "/api/auth/login",
             data={"username": "public_ds@test.bf", "password": "Public123!"},
@@ -93,7 +99,7 @@ class TestCreateDataset:
 @pytest.mark.asyncio
 class TestGetDataset:
     async def test_get_by_slug(self, client, institutional_token):
-        # Créer d'abord un dataset
+        # CrÃ©er d'abord un dataset
         create = await client.post(
             "/api/datasets",
             json={"name": "Dataset slug test", "license": "open", "status": "published"},
@@ -155,7 +161,7 @@ class TestUpdateDataset:
     async def test_publish_sets_published_at(self, client, institutional_token):
         create = await client.post(
             "/api/datasets",
-            json={"name": "À publier", "license": "open"},
+            json={"name": "Ã€ publier", "license": "open"},
             headers={"Authorization": f"Bearer {institutional_token}"},
         )
         slug = create.json()["slug"]
@@ -252,7 +258,7 @@ class TestDeleteDataset:
     async def test_delete_requires_admin(self, client, institutional_token):
         create = await client.post(
             "/api/datasets",
-            json={"name": "À supprimer", "license": "open"},
+            json={"name": "Ã€ supprimer", "license": "open"},
             headers={"Authorization": f"Bearer {institutional_token}"},
         )
         slug = create.json()["slug"]
@@ -277,7 +283,7 @@ class TestDeleteDataset:
         )
         assert resp.status_code == 204
 
-        # Vérifier que le dataset n'existe plus
+        # VÃ©rifier que le dataset n'existe plus
         get_resp = await client.get(f"/api/datasets/{slug}")
         assert get_resp.status_code == 404
 
@@ -305,7 +311,7 @@ class TestAdminList:
 @pytest.mark.asyncio
 class TestMyDatasets:
     async def test_my_datasets_returns_own_only(self, client, institutional_token):
-        # Créer 2 datasets
+        # CrÃ©er 2 datasets
         await client.post(
             "/api/datasets",
             json={"name": "Mon dataset 1", "license": "open"},

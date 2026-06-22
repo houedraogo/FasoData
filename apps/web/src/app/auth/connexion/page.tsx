@@ -126,7 +126,7 @@ function ConnexionInner() {
             Connexion
           </button>
           <Link href="/auth/inscription" className="pb-3 text-sm font-medium text-gray-400 hover:text-gray-600">
-            Inscription
+            Demande d'accès
           </Link>
         </div>
 
@@ -196,9 +196,9 @@ function ConnexionInner() {
         </form>
 
         <p className="text-center text-sm text-gray-500 mt-6">
-          Pas encore de compte ?{" "}
+          Besoin d'un accès contributeur ?{" "}
           <Link href="/auth/inscription" className="text-[#E04E2F] font-semibold hover:underline">
-            S'inscrire →
+            Demander un accès →
           </Link>
         </p>
       </div>

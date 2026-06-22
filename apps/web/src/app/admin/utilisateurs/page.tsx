@@ -1,16 +1,18 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Search, Download, UserPlus, MoreHorizontal, X, ChevronDown,
   Loader2, ChevronLeft, ChevronRight, Shield, Users,
+  UserCheck,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import toast from "react-hot-toast";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// Types
 
 type UserRole = "admin" | "institutional" | "public";
 
@@ -34,7 +36,11 @@ interface UserOutList {
   page_size: number;
 }
 
-// ── Config visuelle ───────────────────────────────────────────────────────────
+interface AccessRequestSummary {
+  total: number;
+}
+
+// Config visuelle
 
 const ROLE_LABELS: Record<UserRole, string> = {
   admin:         "Administrateur",
@@ -76,7 +82,7 @@ function formatDate(iso: string): string {
   return d.toLocaleDateString("fr-FR");
 }
 
-// ── Page ─────────────────────────────────────────────────────────────────────
+// Page
 
 const PAGE_SIZE = 20;
 
@@ -89,6 +95,13 @@ export default function UtilisateursPage() {
   const [editActive, setEditActive] = useState(true);
   const [showInvite, setShowInvite] = useState(false);
   const [debouncedQ, setDebouncedQ] = useState("");
+  const [inviteForm, setInviteForm] = useState({
+    email: "",
+    full_name: "",
+    organization: "",
+    role: "Contributeur",
+    access_level: "viewer",
+  });
 
   // Debounce recherche 300ms
   const handleSearch = (val: string) => {
@@ -98,7 +111,7 @@ export default function UtilisateursPage() {
     (window as unknown as { _st?: ReturnType<typeof setTimeout> })._st = setTimeout(() => setDebouncedQ(val), 300);
   };
 
-  // ── Requêtes ──────────────────────────────────────────────────────────────
+  // Requetes API
 
   const { data, isLoading, isFetching } = useQuery<UserOutList>({
     queryKey: ["admin-users", page, debouncedQ],
@@ -109,6 +122,19 @@ export default function UtilisateursPage() {
         ...(debouncedQ ? { q: debouncedQ } : {}),
       });
       const { data } = await api.get(`/users?${params}`);
+      return data;
+    },
+  });
+
+  const { data: pendingRequests, isLoading: isLoadingPendingRequests } = useQuery<AccessRequestSummary>({
+    queryKey: ["admin-access-requests-summary", "pending"],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        page: "1",
+        page_size: "1",
+        status: "pending",
+      });
+      const { data } = await api.get(`/users/access-requests?${params}`);
       return data;
     },
   });
@@ -126,17 +152,39 @@ export default function UtilisateursPage() {
     onError: () => toast.error("Impossible de modifier l'utilisateur"),
   });
 
-  // ── Stats agrégées ────────────────────────────────────────────────────────
+  const inviteMutation = useMutation({
+    mutationFn: async () => {
+      const organization = inviteForm.organization.trim();
+      if (!inviteForm.email.includes("@")) throw new Error("email");
+      if (!organization) throw new Error("organization");
+      const { data } = await api.post("/dashboard/team-members", {
+        ...inviteForm,
+        organization,
+        status: "invited",
+        is_owner: false,
+      });
+      return data;
+    },
+    onSuccess: () => {
+      toast.success("Invitation envoyée");
+      setShowInvite(false);
+      setInviteForm({ email: "", full_name: "", organization: "", role: "Contributeur", access_level: "viewer" });
+    },
+    onError: () => toast.error("Impossible d'envoyer l'invitation"),
+  });
+
+  // Stats agregees
 
   const users   = data?.items ?? [];
   const total   = data?.total ?? 0;
   const totalPages = Math.ceil(total / PAGE_SIZE);
+  const pendingRequestTotal = pendingRequests?.total ?? 0;
 
   const roleStats: Record<UserRole, number> = { admin: 0, institutional: 0, public: 0 };
   users.forEach((u) => { roleStats[u.role]++; });
   const activeCount = users.filter((u) => u.is_active).length;
 
-  // ── Rendu ─────────────────────────────────────────────────────────────────
+  // Rendu
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
@@ -194,6 +242,32 @@ export default function UtilisateursPage() {
         ))}
       </div>
 
+      {/* Apercu demandes d'acces */}
+      <div className="mb-5 rounded-2xl border border-amber-100 bg-amber-50/60 px-4 py-4 shadow-sm sm:px-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-amber-600 shadow-sm">
+              <UserCheck className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-gray-900">Demandes d'acces contributeur</h2>
+              <p className="mt-0.5 text-xs text-gray-500">
+                {isLoadingPendingRequests
+                  ? "Chargement des demandes en attente..."
+                  : pendingRequestTotal > 0
+                    ? `${pendingRequestTotal} demande(s) en attente de validation.`
+                    : "Aucune demande en attente pour le moment."}
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/admin/demandes-acces"
+            className="inline-flex items-center justify-center rounded-xl bg-[#1A2C42] px-4 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-[#223a57]"
+          >
+            Ouvrir les demandes
+          </Link>
+        </div>
+      </div>
       {/* Table */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
 
@@ -205,7 +279,7 @@ export default function UtilisateursPage() {
               type="text"
               value={search}
               onChange={(e) => handleSearch(e.target.value)}
-              placeholder="Nom, email, organisation…"
+              placeholder="Nom, email, organisation..."
               className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#E04E2F]/20"
             />
           </div>
@@ -213,7 +287,7 @@ export default function UtilisateursPage() {
           <span className="text-xs text-gray-400 ml-auto">{total} résultats</span>
         </div>
 
-        {/* En-tête colonnes — masqué sur mobile */}
+        {/* En-tête colonnes masqué sur mobile */}
         <div className="hidden md:grid grid-cols-[2fr_1.5fr_1.5fr_1.5fr_1fr_auto] gap-4 px-5 py-2.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider border-b border-gray-50 bg-gray-50/50">
           <span>Utilisateur</span>
           <span>Organisation</span>
@@ -268,7 +342,7 @@ export default function UtilisateursPage() {
 
                 {/* Organisation */}
                 <span className="text-sm text-gray-600 truncate hidden md:block">
-                  {user.organization ?? <span className="text-gray-300">—</span>}
+                  {user.organization ?? <span className="text-gray-300">-</span>}
                 </span>
 
                 {/* Rôle */}
@@ -390,7 +464,7 @@ export default function UtilisateursPage() {
                   disabled={updateUserMutation.isPending}
                   className="flex items-center gap-2 px-4 py-2.5 bg-[#1A2C42] hover:bg-[#0f1e30] disabled:opacity-60 text-white rounded-xl text-sm font-semibold transition-colors">
                   {updateUserMutation.isPending
-                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Enregistrement…</>
+                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Enregistrement...</>
                     : <><Shield className="w-4 h-4" /> Enregistrer</>}
                 </button>
               </div>
@@ -410,17 +484,62 @@ export default function UtilisateursPage() {
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <p className="text-sm text-gray-500 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
-              💡 Pour inviter un utilisateur, demandez-lui de créer un compte sur{" "}
-              <a href="/auth/inscription" className="font-semibold text-[#1A2C42] underline">
-                /auth/inscription
-              </a>.
-              Vous pourrez ensuite modifier son rôle ici.
-            </p>
-            <button onClick={() => setShowInvite(false)}
-              className="mt-4 w-full py-2.5 bg-[#1A2C42] text-white rounded-xl text-sm font-semibold">
-              Compris
-            </button>
+            <div className="space-y-3">
+              <input
+                type="email"
+                value={inviteForm.email}
+                onChange={(e) => setInviteForm((p) => ({ ...p, email: e.target.value }))}
+                placeholder="collaborateur@organisation.bf"
+                className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1A2C42]/20"
+              />
+              <input
+                type="text"
+                value={inviteForm.full_name}
+                onChange={(e) => setInviteForm((p) => ({ ...p, full_name: e.target.value }))}
+                placeholder="Nom complet"
+                className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1A2C42]/20"
+              />
+              <input
+                type="text"
+                value={inviteForm.organization}
+                onChange={(e) => setInviteForm((p) => ({ ...p, organization: e.target.value }))}
+                placeholder="Organisation"
+                className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1A2C42]/20"
+              />
+              <div className="grid grid-cols-2 gap-3">
+                <select
+                  value={inviteForm.role}
+                  onChange={(e) => setInviteForm((p) => ({ ...p, role: e.target.value }))}
+                  className="px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1A2C42]/20"
+                >
+                  {["Contributeur", "Analyste données", "Responsable programme", "Lecteur"].map((role) => (
+                    <option key={role} value={role}>{role}</option>
+                  ))}
+                </select>
+                <select
+                  value={inviteForm.access_level}
+                  onChange={(e) => setInviteForm((p) => ({ ...p, access_level: e.target.value }))}
+                  className="px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1A2C42]/20"
+                >
+                  <option value="viewer">Lecteur</option>
+                  <option value="editor">Éditeur</option>
+                  <option value="admin">Admin organisation</option>
+                </select>
+              </div>
+              <p className="text-xs leading-relaxed text-gray-500 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
+                L'adresse invitée pourra créer son compte ou se connecter avec Google. Elle sera automatiquement rattachée à cette organisation.
+              </p>
+            </div>
+            <div className="mt-4 flex gap-3">
+              <button onClick={() => setShowInvite(false)}
+                className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600">
+                Annuler
+              </button>
+              <button onClick={() => inviteMutation.mutate()} disabled={inviteMutation.isPending}
+                className="flex-1 py-2.5 bg-[#1A2C42] text-white rounded-xl text-sm font-semibold disabled:opacity-60">
+                {inviteMutation.isPending ? "Envoi..." : "Inviter"}
+              </button>
+            </div>
           </div>
         </div>
       )}

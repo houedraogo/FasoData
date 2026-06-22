@@ -142,9 +142,9 @@ export default function AdminPrixPage() {
   const pendingCount = counts["pending"] ?? 0;
 
   const TABS: { key: Tab; icon: React.ElementType; label: string; badge?: number }[] = [
-    { key: "validation",  icon: Shield,       label: "Validation SMS",   badge: pendingCount },
+    { key: "validation",  icon: Shield,       label: "Validation relevés", badge: pendingCount },
     { key: "aggregation", icon: BarChart3,     label: "Agrégation nocturne" },
-    { key: "sms_test",    icon: MessageSquare, label: "Tests sandbox" },
+    { key: "sms_test",    icon: MessageSquare, label: "Tests WhatsApp" },
   ];
 
   return (
@@ -153,7 +153,7 @@ export default function AdminPrixPage() {
       {/* En-tête */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div className="min-w-0">
-          <h1 className="text-2xl font-bold text-gray-900">SMS Prix — Africa's Talking</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Relevés Terrain — WhatsApp</h1>
           <p className="text-gray-500 text-sm mt-1">
             Validation des relevés terrain · Agrégation nocturne · Monitoring
           </p>
@@ -163,7 +163,7 @@ export default function AdminPrixPage() {
         <div className={cn("flex w-full items-center gap-2 px-4 py-2 rounded-xl border text-sm font-medium sm:w-auto",
           atStatus?.at_configured ? "bg-green-50 border-green-200 text-green-700" : "bg-amber-50 border-amber-200 text-amber-700")}>
           <span className={cn("w-2 h-2 rounded-full", atStatus?.at_configured ? "bg-green-500 animate-pulse" : "bg-amber-500")} />
-          {atStatus?.at_configured ? "AT Opérationnel" : "Mode local"}
+          {"WhatsApp Actif"}
         </div>
       </div>
 
@@ -474,10 +474,10 @@ export default function AdminPrixPage() {
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
             <h2 className="font-bold text-gray-900 mb-1 flex items-center gap-2">
               <MessageSquare className="w-4 h-4 text-[#E04E2F]" />
-              Simulateur sandbox de SMS entrant
+              Simulateur de message WhatsApp entrant
             </h2>
             <p className="text-xs text-gray-400 mb-5">
-              Outil admin de test : simule un POST Africa's Talking vers le webhook, sans SIM requise.
+              Outil admin de test : simule un message WhatsApp d'enquêteur vers le webhook.
             </p>
 
             {/* Exemples rapides */}
@@ -548,7 +548,7 @@ export default function AdminPrixPage() {
                 <button onClick={sendTestSms}
                   className="w-full flex items-center justify-center gap-2 py-2.5 bg-[#1A2C42] hover:bg-[#0f1e30] text-white font-semibold rounded-xl text-sm transition-colors">
                   <Send className="w-4 h-4" />
-                  {atStatus?.at_configured ? "Envoyer via AT" : "Simuler l'envoi"}
+                  {"Envoyer via WhatsApp"}
                 </button>
               </div>
             </div>

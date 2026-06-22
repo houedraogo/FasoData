@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ArrowRight, BarChart3, Building2, Database, Download, Globe, GraduationCap, Landmark, Map, Search, Shield, Users } from "lucide-react";
+import { ArrowRight, BarChart3, Building2, Database, Download, Globe, GraduationCap, Landmark, Map, Search, Shield, Users, TrendingUp, ShoppingCart, Truck, Factory, ChevronRight } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import PrixDuJourWidget from "@/components/home/PrixDuJourWidget";
@@ -39,6 +39,7 @@ function ContributeurForm() {
         body: JSON.stringify({
           nom:     String(fd.get("nom") ?? "").trim(),
           email:   String(fd.get("email") ?? "").trim(),
+          phone:   String(fd.get("phone") ?? "").trim(),
           region:  String(fd.get("region") ?? "").trim(),
           marche:  String(fd.get("marche") ?? "").trim(),
           message: String(fd.get("message") ?? "").trim(),
@@ -84,6 +85,12 @@ function ContributeurForm() {
           <input name="email" type="email" required placeholder="vous@example.com"
             className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-faso-navy/20" />
         </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">WhatsApp *</label>
+          <input name="phone" type="tel" required placeholder="+226 XX XX XX XX"
+            className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-faso-navy/20" />
+        </div>
       </div>
 
       <div>
@@ -113,9 +120,6 @@ function ContributeurForm() {
         className="w-full py-3 bg-[#E04E2F] hover:bg-[#c73e22] text-white font-semibold rounded-xl text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-60">
         {loading ? "Préparation…" : "Envoyer ma candidature →"}
       </button>
-      <p className="text-xs text-gray-400 text-center">
-        Votre client email s'ouvrira pour l'envoi final.
-      </p>
     </form>
   );
 }
@@ -619,6 +623,179 @@ export default function HomePage() {
           <p className="text-center text-xs text-gray-400 mt-10">
             Les données ouvertes (WFP, SONAGESS, INSD, Ministères) complètent les relevés terrain — elles ne les remplacent pas.
           </p>
+
+        </div>
+      </section>
+
+      {/* ── Section Entreprises — Études de marché ── */}
+      <section className="py-20 bg-white border-t border-gray-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+          {/* En-tête */}
+          <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6 mb-14">
+            <div>
+              <span className="inline-block px-4 py-1.5 bg-[#1A2C42]/8 text-[#1A2C42] text-sm font-bold rounded-full mb-4 uppercase tracking-wider border border-[#1A2C42]/12">
+                Pour les entreprises
+              </span>
+              <h2 className="text-3xl lg:text-4xl font-bold text-faso-navy leading-tight">
+                Prenez des décisions<br />
+                <span className="text-[#E04E2F]">fondées sur la réalité du marché</span>
+              </h2>
+              <p className="text-gray-500 mt-4 max-w-xl leading-relaxed">
+                Importateurs, distributeurs, industriels, investisseurs — FasoData vous donne
+                accès aux données de marché que vous payiez autrefois à des cabinets de conseil.
+              </p>
+            </div>
+            <Link href="/auth/inscription"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-[#1A2C42] text-white font-semibold rounded-xl hover:bg-[#1A2C42]/90 transition-all shrink-0 self-start lg:self-auto">
+              Accès entreprise <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+
+          {/* Cas d'usage entreprises — 4 cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-14">
+
+            {/* 1 — Importateurs / grossistes */}
+            <div className="rounded-2xl border border-gray-100 bg-gray-50 p-7 flex gap-5">
+              <div className="w-12 h-12 bg-[#E04E2F]/10 rounded-xl flex items-center justify-center shrink-0">
+                <Truck className="w-6 h-6 text-[#E04E2F]" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-[#E04E2F] uppercase tracking-wider mb-1">Importateurs · Grossistes</p>
+                <h3 className="font-bold text-faso-navy mb-2">Optimiser les prix d'achat et d'approvisionnement</h3>
+                <p className="text-sm text-gray-500 leading-relaxed mb-4">
+                  Suivez en temps réel les prix sur les marchés de gros de Ouaga, Bobo, Banfora et Dédougou.
+                  Anticipez les tensions saisonnières avant qu'elles n'impactent vos marges.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {["Prix marchés de gros", "Alertes hausses", "Comparatif régions", "Saisonnalité"].map((tag) => (
+                    <span key={tag} className="px-2.5 py-1 bg-white border border-gray-200 text-xs font-medium text-gray-600 rounded-full">{tag}</span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* 2 — Transformateurs / industries agroalimentaires */}
+            <div className="rounded-2xl border border-gray-100 bg-gray-50 p-7 flex gap-5">
+              <div className="w-12 h-12 bg-purple-50 rounded-xl flex items-center justify-center shrink-0">
+                <Factory className="w-6 h-6 text-purple-600" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-purple-600 uppercase tracking-wider mb-1">Agroalimentaire · Transformation</p>
+                <h3 className="font-bold text-faso-navy mb-2">Planifier la production selon les prix des matières premières</h3>
+                <p className="text-sm text-gray-500 leading-relaxed mb-4">
+                  Sorgho, maïs, niébé — accédez aux séries historiques sur 3 ans pour ajuster
+                  vos volumes de production et négocier vos contrats d'approvisionnement en connaissance de cause.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {["Séries 3 ans", "Export CSV/Excel", "API REST", "Corrélations produits"].map((tag) => (
+                    <span key={tag} className="px-2.5 py-1 bg-white border border-gray-200 text-xs font-medium text-gray-600 rounded-full">{tag}</span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* 3 — Investisseurs / fonds */}
+            <div className="rounded-2xl border border-gray-100 bg-gray-50 p-7 flex gap-5">
+              <div className="w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center shrink-0">
+                <TrendingUp className="w-6 h-6 text-green-600" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-green-600 uppercase tracking-wider mb-1">Investisseurs · Fonds d'impact</p>
+                <h3 className="font-bold text-faso-navy mb-2">Due diligence et analyse des opportunités agricoles</h3>
+                <p className="text-sm text-gray-500 leading-relaxed mb-4">
+                  Évaluez la viabilité d'un projet agricole ou d'une filière avec des données
+                  de marché vérifiées. Comparaison inter-pays (Mali, Niger, Côte d'Ivoire) disponible.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {["Comparaison inter-pays", "Tendances long terme", "Rapport PDF", "Données vérifiées WFP"].map((tag) => (
+                    <span key={tag} className="px-2.5 py-1 bg-white border border-gray-200 text-xs font-medium text-gray-600 rounded-full">{tag}</span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* 4 — GMS / Distribution */}
+            <div className="rounded-2xl border border-gray-100 bg-gray-50 p-7 flex gap-5">
+              <div className="w-12 h-12 bg-amber-50 rounded-xl flex items-center justify-center shrink-0">
+                <ShoppingCart className="w-6 h-6 text-amber-600" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-amber-600 uppercase tracking-wider mb-1">Distribution · Commerce de détail</p>
+                <h3 className="font-bold text-faso-navy mb-2">Fixer vos prix de vente en phase avec le marché réel</h3>
+                <p className="text-sm text-gray-500 leading-relaxed mb-4">
+                  Accédez aux prix de détail pratiqués dans chaque région. Positionnez-vous
+                  par rapport à la concurrence et identifiez les zones sous-approvisionnées.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {["Prix détail par région", "Carte géographique", "Alertes prix concurrents", "Segments produits"].map((tag) => (
+                    <span key={tag} className="px-2.5 py-1 bg-white border border-gray-200 text-xs font-medium text-gray-600 rounded-full">{tag}</span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Bandeau comparatif — "ce que vous aviez avant vs FasoData" */}
+          <div className="rounded-2xl bg-gradient-to-br from-[#1A2C42] to-[#0f1e30] p-8 text-white">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-center">
+
+              {/* Avant */}
+              <div>
+                <p className="text-xs font-bold text-white/40 uppercase tracking-widest mb-4">Avant FasoData</p>
+                <div className="space-y-3">
+                  {[
+                    "Cabinet de conseil : 2–5 millions FCFA l'étude",
+                    "Données souvent vieilles de 6 à 18 mois",
+                    "Couverture partielle (2 ou 3 régions)",
+                    "Format PDF, impossible à intégrer",
+                  ].map((item) => (
+                    <div key={item} className="flex items-start gap-2.5 text-sm text-white/50">
+                      <span className="text-red-400 mt-0.5 shrink-0">✕</span>
+                      <span>{item}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Séparateur */}
+              <div className="flex lg:flex-col items-center justify-center gap-3">
+                <div className="h-px lg:h-16 w-16 lg:w-px bg-white/10 flex-shrink-0" />
+                <div className="w-12 h-12 rounded-xl bg-[#E04E2F] flex items-center justify-center shrink-0">
+                  <ChevronRight className="w-6 h-6 text-white" />
+                </div>
+                <div className="h-px lg:h-16 w-16 lg:w-px bg-white/10 flex-shrink-0" />
+              </div>
+
+              {/* Après */}
+              <div>
+                <p className="text-xs font-bold text-[#F5A623] uppercase tracking-widest mb-4">Avec FasoData</p>
+                <div className="space-y-3">
+                  {[
+                    "Accès institutionnel dès 0 FCFA (open data)",
+                    "Données actualisées chaque semaine par le terrain",
+                    "Toutes les 13 régions du Burkina Faso",
+                    "API REST + export CSV/Excel intégrable",
+                  ].map((item) => (
+                    <div key={item} className="flex items-start gap-2.5 text-sm text-white/80">
+                      <span className="text-green-400 mt-0.5 shrink-0">✓</span>
+                      <span>{item}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-white/10 mt-8 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <p className="text-white/50 text-sm">
+                Besoin d'une étude personnalisée ou d'un accès données privées ?
+              </p>
+              <Link href="/contact"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-white/10 hover:bg-white/15 border border-white/20 text-white text-sm font-semibold rounded-xl transition-all shrink-0">
+                Contacter l'équipe <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+          </div>
 
         </div>
       </section>

@@ -136,7 +136,7 @@ console.log(await client.get("/api/prices/latest", { region: "National", sources
 
 const FALLBACK_ENDPOINTS: Endpoint[] = [
   { method: "GET", path: "/api/health", scope: "Public", desc: "Etat du service API et version courante." },
-  { method: "POST", path: "/api/auth/register", scope: "Public", desc: "Cree un compte utilisateur." },
+  { method: "POST", path: "/api/auth/register", scope: "Institution", desc: "Cree un acces contributeur institutionnel." },
   { method: "POST", path: "/api/auth/login", scope: "Public", desc: "Retourne un access token et un refresh token." },
   { method: "POST", path: "/api/auth/refresh", scope: "Public", desc: "Renouvelle une session avec un refresh token." },
   { method: "GET", path: "/api/auth/me", scope: "Bearer", desc: "Profil du compte connecte." },

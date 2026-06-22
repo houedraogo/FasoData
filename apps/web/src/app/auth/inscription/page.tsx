@@ -10,23 +10,21 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
-  Eye, EyeOff, Loader2, Building2, User,
+  Eye, EyeOff, Loader2, Building2,
   CheckCircle2, ShieldCheck, Users,
 } from "lucide-react";
 import { api } from "@/lib/api";
-import { useAuth } from "@/hooks/useAuth";
 import toast from "react-hot-toast";
 import { cn } from "@/lib/utils";
-import { GoogleButton } from "@/components/auth/GoogleButton";
+import axios from "axios";
 
 // ── Schéma de validation ────────────────────────────────────────────────────
 
 const schema = z
   .object({
-    role: z.enum(["public", "institutional"]),
     full_name: z.string().min(2, "Nom trop court (min. 2 caractères)"),
     email: z.string().email("Adresse email invalide"),
-    organization: z.string().optional(),
+    organization: z.string().min(2, "Nom de l'organisation requis"),
     password: z
       .string()
       .min(8, "8 caractères minimum")
@@ -37,14 +35,7 @@ const schema = z
   .refine((d) => d.password === d.confirm_password, {
     message: "Les mots de passe ne correspondent pas",
     path: ["confirm_password"],
-  })
-  .refine(
-    (d) => d.role !== "institutional" || (d.organization && d.organization.trim().length >= 2),
-    {
-      message: "Nom de l'organisation requis",
-      path: ["organization"],
-    }
-  );
+  });
 
 type FormData = z.infer<typeof schema>;
 
@@ -95,22 +86,19 @@ function PasswordStrength({ password }: { password: string }) {
 
 function InscriptionInner() {
   const router = useRouter();
-  const { login } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [submittedEmail, setSubmittedEmail] = useState<string | null>(null);
 
   const {
     register,
     handleSubmit,
     watch,
-    setValue,
     formState: { errors, isSubmitting },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { role: "public" },
   });
 
-  const role = watch("role");
   const password = watch("password") ?? "";
 
   const onSubmit = async (data: FormData) => {
@@ -118,18 +106,19 @@ function InscriptionInner() {
       await api.post("/auth/register", {
         email: data.email,
         full_name: data.full_name,
-        organization: data.role === "institutional" ? data.organization : undefined,
+        organization: data.organization,
         password: data.password,
-        role: data.role,
+        role: "institutional",
       });
-      // Auto-connexion après inscription
-      await login(data.email, data.password);
-      toast.success("Compte créé avec succès !");
-      router.push("/onboarding");
+      toast.success("Demande d'accès envoyée");
+      setSubmittedEmail(data.email);
     } catch (err: unknown) {
-      const status = (err as { response?: { status?: number } })?.response?.status;
+      const status = axios.isAxiosError(err) ? err.response?.status : undefined;
+      const detail = axios.isAxiosError(err) ? err.response?.data?.detail : undefined;
       if (status === 409) {
         toast.error("Cette adresse email est déjà utilisée.");
+      } else if (typeof detail === "string") {
+        toast.error(detail);
       } else {
         toast.error("Une erreur est survenue. Réessayez.");
       }
@@ -160,17 +149,17 @@ function InscriptionInner() {
 
           <div>
             <h2 className="text-2xl font-bold text-white mb-3">
-              Rejoignez la plateforme
+              Rejoignez l'espace contributeur
             </h2>
             <p className="text-white/70 leading-relaxed">
-              Accédez à des milliers de jeux de données sur le Burkina Faso et contribuez à l'open data national.
+              Le catalogue public reste accessible sans compte. Un accès est nécessaire uniquement pour publier, suivre des programmes et collaborer au nom d'une organisation.
             </p>
           </div>
 
           {/* Avantages */}
           <div className="space-y-3 text-left">
             {[
-              { icon: Users, text: "Accès libre à tous les datasets publics" },
+              { icon: Users, text: "Catalogue public accessible sans compte" },
               { icon: ShieldCheck, text: "Données fiables et sourcées" },
               { icon: Building2, text: "Publiez vos données institutionnelles" },
             ].map(({ icon: Icon, text }) => (
@@ -199,71 +188,34 @@ function InscriptionInner() {
             </Link>
           </div>
 
-          <h1 className="text-2xl font-bold text-faso-navy mb-1">Créer un compte</h1>
+          <h1 className="text-2xl font-bold text-faso-navy mb-1">Demander un accès contributeur</h1>
           <p className="text-gray-500 text-sm mb-6">
-            Déjà inscrit ?{" "}
+            Déjà membre d'une organisation ?{" "}
             <Link href="/auth/connexion" className="text-faso-red font-medium hover:underline">
               Se connecter
             </Link>
           </p>
 
-          {/* SSO Google */}
-          <GoogleButton />
-
-          <div className="flex items-center gap-3 my-5">
-            <div className="flex-1 h-px bg-gray-200" />
-            <span className="text-xs text-gray-400 font-medium">OU</span>
-            <div className="flex-1 h-px bg-gray-200" />
-          </div>
-
+          {submittedEmail ? (
+            <div className="rounded-2xl border border-green-100 bg-green-50 p-5 text-green-900">
+              <CheckCircle2 className="mb-3 h-8 w-8 text-green-600" />
+              <h2 className="text-lg font-bold">Demande envoyée</h2>
+              <p className="mt-2 text-sm leading-6">
+                Votre demande pour <strong>{submittedEmail}</strong> est en attente de validation par un administrateur FasoData.
+              </p>
+              <button
+                type="button"
+                onClick={() => router.push("/auth/connexion")}
+                className="mt-5 w-full btn-primary justify-center py-3"
+              >
+                Aller à la connexion
+              </button>
+            </div>
+          ) : (
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
 
-            {/* ── Choix du type de compte ── */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Type de compte
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                {(
-                  [
-                    {
-                      value: "public",
-                      icon: User,
-                      label: "Citoyen / Chercheur",
-                      desc: "Consulter et télécharger des données",
-                    },
-                    {
-                      value: "institutional",
-                      icon: Building2,
-                      label: "Institution / ONG",
-                      desc: "Publier et gérer des datasets",
-                    },
-                  ] as const
-                ).map(({ value, icon: Icon, label, desc }) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setValue("role", value, { shouldValidate: true })}
-                    className={cn(
-                      "p-4 rounded-xl border-2 text-left transition-all",
-                      role === value
-                        ? "border-faso-navy bg-faso-navy/5"
-                        : "border-gray-200 hover:border-gray-300 bg-white"
-                    )}
-                  >
-                    <div className={cn(
-                      "w-8 h-8 rounded-lg flex items-center justify-center mb-2",
-                      role === value ? "bg-faso-navy" : "bg-gray-100"
-                    )}>
-                      <Icon className={cn("w-4 h-4", role === value ? "text-white" : "text-gray-500")} />
-                    </div>
-                    <div className={cn("font-semibold text-sm", role === value ? "text-faso-navy" : "text-gray-700")}>
-                      {label}
-                    </div>
-                    <div className="text-xs text-gray-500 mt-0.5">{desc}</div>
-                  </button>
-                ))}
-              </div>
+            <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-900">
+              Vous n'avez pas besoin de compte pour consulter ou télécharger les données publiques. Ce formulaire est réservé aux ONG, institutions, universités, entreprises partenaires et administrations qui souhaitent contribuer.
             </div>
 
             {/* ── Nom complet ── */}
@@ -290,7 +242,7 @@ function InscriptionInner() {
               <input
                 type="email"
                 {...register("email")}
-                placeholder={role === "institutional" ? "contact@organisation.bf" : "vous@example.com"}
+                placeholder="contact@organisation.bf"
                 className="input-field"
               />
               {errors.email && (
@@ -298,23 +250,20 @@ function InscriptionInner() {
               )}
             </div>
 
-            {/* ── Organisation (institutional seulement) ── */}
-            {role === "institutional" && (
-              <div className="transition-all duration-200">
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Nom de l'organisation <span className="text-faso-red">*</span>
-                </label>
-                <input
-                  type="text"
-                  {...register("organization")}
-                  placeholder="Ministère / ONG / Entreprise..."
-                  className="input-field"
-                />
-                {errors.organization && (
-                  <p className="text-red-500 text-xs mt-1">{errors.organization.message}</p>
-                )}
-              </div>
-            )}
+            <div className="transition-all duration-200">
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Nom de l'organisation <span className="text-faso-red">*</span>
+              </label>
+              <input
+                type="text"
+                {...register("organization")}
+                placeholder="Ministère / ONG / Université / Entreprise..."
+                className="input-field"
+              />
+              {errors.organization && (
+                <p className="text-red-500 text-xs mt-1">{errors.organization.message}</p>
+              )}
+            </div>
 
             {/* ── Mot de passe ── */}
             <div>
@@ -369,7 +318,7 @@ function InscriptionInner() {
 
             {/* ── Conditions d'utilisation ── */}
             <p className="text-xs text-gray-500 leading-relaxed">
-              En créant un compte, vous acceptez les{" "}
+              En demandant un accès contributeur, vous acceptez les{" "}
               <Link href="/conditions" className="text-faso-red hover:underline">
                 conditions d'utilisation
               </Link>{" "}
@@ -389,13 +338,14 @@ function InscriptionInner() {
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Création du compte...
+                  Création de l'accès...
                 </>
               ) : (
-                "Créer mon compte"
+                "Créer mon accès contributeur"
               )}
             </button>
           </form>
+          )}
         </div>
       </div>
     </div>

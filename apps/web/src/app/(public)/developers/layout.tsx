@@ -1,13 +1,26 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "API Développeurs",
+  title: "API Développeurs — Données ouvertes Burkina Faso",
   description:
-    "Intégrez les données ouvertes du Burkina Faso dans vos applications. API REST, authentification JWT, exemples curl et SDK. Documentation complète disponible.",
+    "API REST pour intégrer les données ouvertes du Burkina Faso dans vos applications. Prix alimentaires, datasets agricoles, indicateurs socioéconomiques — authentification JWT, formats JSON/CSV, documentation Swagger.",
+  keywords: [
+    "API Burkina Faso données",
+    "API REST données ouvertes Burkina",
+    "API prix alimentaires Burkina Faso",
+    "intégrer données Burkina Faso",
+    "API JSON CSV Burkina",
+    "API open data Afrique",
+    "développeur données Burkina Faso",
+    "SDK données Burkina Faso",
+    "API agriculture Burkina Faso",
+    "données machine readable Burkina",
+  ],
+  alternates: { canonical: "/developers" },
   openGraph: {
-    title: "API Développeurs — FasoData",
+    title: "API Développeurs — FasoData Burkina Faso",
     description:
-      "API REST pour accéder aux données ouvertes du Burkina Faso. Auth JWT, pagination, filtres, formats JSON/CSV.",
+      "API REST pour accéder aux données ouvertes du Burkina Faso : prix alimentaires, agriculture, indicateurs. Auth JWT, JSON/CSV, documentation Swagger complète.",
     url: "https://fasodata.com/developers",
     siteName: "FasoData",
     type: "website",
@@ -15,7 +28,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary",
     title: "API Développeurs — FasoData",
-    description: "API REST pour les données ouvertes du Burkina Faso.",
+    description: "API REST open data Burkina Faso. Prix alimentaires, agriculture, indicateurs. JSON/CSV, auth JWT.",
   },
 };
 

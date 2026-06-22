@@ -1,10 +1,17 @@
+import httpx
 from fastapi import APIRouter, HTTPException
+from html import escape
 from pydantic import BaseModel, EmailStr
 
 from fasodata.alerts.email_service import _send
+from fasodata.alerts.whatsapp_service import normalize_whatsapp_number
 from fasodata.core.config import get_settings
 
 router = APIRouter(prefix="/api/contact", tags=["contact"])
+
+
+def _html(value: object) -> str:
+    return escape(str(value or ""))
 
 
 class ContactPayload(BaseModel):
@@ -18,6 +25,11 @@ class ContactPayload(BaseModel):
 @router.post("/message", status_code=200)
 async def contact_message(payload: ContactPayload):
     settings = get_settings()
+    app_base_url = settings.public_app_base_url
+    sender_name = _html(f"{payload.firstName} {payload.lastName}")
+    email = _html(payload.email)
+    subject = _html(payload.subject)
+    message = _html(payload.message)
 
     body_html = f"""
       <h2 style="color:#1A2C42;margin:0 0 8px">Nouveau message de contact</h2>
@@ -29,21 +41,21 @@ async def contact_message(payload: ContactPayload):
         </tr>
         <tr>
           <td style="padding:8px 12px;color:#6b7280;font-size:13px;width:120px">Nom</td>
-          <td style="padding:8px 12px;color:#111;font-weight:600;font-size:13px">{payload.firstName} {payload.lastName}</td>
+          <td style="padding:8px 12px;color:#111;font-weight:600;font-size:13px">{sender_name}</td>
         </tr>
         <tr style="background:#f8f9fa">
           <td style="padding:8px 12px;color:#6b7280;font-size:13px">Email</td>
           <td style="padding:8px 12px;font-size:13px">
-            <a href="mailto:{payload.email}" style="color:#E04E2F">{payload.email}</a>
+            <a href="mailto:{email}" style="color:#E04E2F">{email}</a>
           </td>
         </tr>
         <tr>
           <td style="padding:8px 12px;color:#6b7280;font-size:13px">Sujet</td>
-          <td style="padding:8px 12px;color:#111;font-weight:600;font-size:13px">{payload.subject}</td>
+          <td style="padding:8px 12px;color:#111;font-weight:600;font-size:13px">{subject}</td>
         </tr>
       </table>
       <div style="background:#f8f9fa;border-radius:12px;padding:16px 20px;border-left:4px solid #1A2C42">
-        <p style="margin:0;color:#374151;font-size:14px;line-height:1.7;white-space:pre-wrap">{payload.message}</p>
+        <p style="margin:0;color:#374151;font-size:14px;line-height:1.7;white-space:pre-wrap">{message}</p>
       </div>
       <p style="color:#9ca3af;font-size:12px;margin:20px 0 0">
         Répondez directement à cet email pour contacter l'expéditeur.
@@ -54,19 +66,20 @@ async def contact_message(payload: ContactPayload):
         to_email=settings.emails_from,
         subject=f"[FasoData Contact] {payload.subject} — {payload.firstName} {payload.lastName}",
         body_html=body_html,
-        unsubscribe_url="https://fasodata.com/",
+        unsubscribe_url=f"{app_base_url}/",
         settings=settings,
     )
 
     if not ok:
         raise HTTPException(status_code=500, detail="Échec d'envoi de l'email.")
 
-    return {"ok": True}
+    return {"ok": True, "message": "Message de contact envoyé"}
 
 
 class ContributeurPayload(BaseModel):
     nom: str
     email: EmailStr
+    phone: str = ""
     region: str
     marche: str
     message: str = ""
@@ -75,12 +88,14 @@ class ContributeurPayload(BaseModel):
 @router.post("/contributeur", status_code=200)
 async def contact_contributeur(payload: ContributeurPayload):
     settings = get_settings()
+    app_base_url = settings.public_app_base_url
 
     rows = [
-        ("Nom",     payload.nom),
-        ("Email",   payload.email),
-        ("Région",  payload.region),
-        ("Marché",  payload.marche),
+        ("Nom",       payload.nom),
+        ("Email",     payload.email),
+        ("Téléphone", payload.phone or "—"),
+        ("Région",    payload.region),
+        ("Marché",    payload.marche),
     ]
     if payload.message:
         rows.append(("Message", payload.message))
@@ -88,7 +103,7 @@ async def contact_contributeur(payload: ContributeurPayload):
     table_rows = "".join(
         f"""<tr>
           <td style="padding:8px 12px;color:#6b7280;font-size:13px">{label}</td>
-          <td style="padding:8px 12px;color:#111;font-weight:600;font-size:13px">{value}</td>
+          <td style="padding:8px 12px;color:#111;font-weight:600;font-size:13px">{_html(value)}</td>
         </tr>"""
         for label, value in rows
     )
@@ -121,7 +136,7 @@ async def contact_contributeur(payload: ContributeurPayload):
         to_email=settings.emails_from,
         subject=f"[FasoData] Candidature contributeur — {payload.nom} · {payload.region}",
         body_html=body_html,
-        unsubscribe_url="https://fasodata.com/",
+        unsubscribe_url=f"{app_base_url}/",
         settings=settings,
     )
 
@@ -129,3 +144,46 @@ async def contact_contributeur(payload: ContributeurPayload):
         raise HTTPException(status_code=500, detail="Échec d'envoi de l'email.")
 
     return {"ok": True}
+
+
+class ApprobationEnqueteurPayload(BaseModel):
+    nom: str
+    phone: str
+
+
+@router.post("/contributeur/approuver", status_code=200)
+async def approuver_enqueteur(payload: ApprobationEnqueteurPayload):
+    """Envoie le message WhatsApp de bienvenue à un enquêteur approuvé."""
+    settings = get_settings()
+    recipient = normalize_whatsapp_number(payload.phone)
+    if not recipient:
+        raise HTTPException(status_code=422, detail="Numéro de téléphone invalide.")
+
+    token = settings.whatsapp_access_token
+    phone_id = settings.whatsapp_phone_number_id
+    base_url = settings.whatsapp_graph_api_url.rstrip("/")
+    prenom = payload.nom.split()[0]
+
+    try:
+        r = httpx.post(
+            f"{base_url}/{phone_id}/messages",
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+            json={
+                "messaging_product": "whatsapp",
+                "to": recipient,
+                "type": "template",
+                "template": {
+                    "name": "bienvenue_enqueteur_fasodata",
+                    "language": {"code": "fr"},
+                    "components": [{
+                        "type": "body",
+                        "parameters": [{"type": "text", "text": prenom}],
+                    }],
+                },
+            },
+            timeout=15,
+        )
+        r.raise_for_status()
+        return {"ok": True, "sent_to": recipient}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Erreur WhatsApp : {exc}")

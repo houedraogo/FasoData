@@ -5,12 +5,11 @@ import { useQueries, useQuery } from "@tanstack/react-query";
 import {
   LineChart, Line, BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-  ResponsiveContainer, ReferenceLine,
+  ResponsiveContainer, ReferenceLine, LabelList,
 } from "recharts";
 import {
   TrendingUp, TrendingDown, Table2, BarChart3,
-  Download, MessageSquare, Smartphone, Wifi, RefreshCw,
-  LayoutGrid, MapPin, Globe,
+  Download, LayoutGrid, MapPin, Globe,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -339,20 +338,33 @@ export default function PrixPage() {
   const tickFmt = (v: string) => formatPeriod(v, granularity);
 
   // ── Rendu graphique ───────────────────────────────────────────────────────
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const labelStyle = (color: string): any => ({ fontSize: 9, fill: color, fontWeight: 600 });
+
   const renderLines = () => activeLines.map((l) => (
     <Line key={l.key} type="monotone" dataKey={l.key} name={l.label}
-      stroke={l.color} strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+      stroke={l.color} strokeWidth={2} dot={{ r: 2, fill: l.color }} activeDot={{ r: 5 }}>
+      <LabelList dataKey={l.key} position="top" style={labelStyle(l.color)}
+        formatter={(v: unknown) => v != null ? `${v}` : ""} />
+    </Line>
   ));
 
   const renderAreas = () => activeLines.map((l) => (
     <Area key={l.key} type="monotone" dataKey={l.key} name={l.label}
       stroke={l.color} strokeWidth={2} fill={`url(#g_${l.key.replace(/[^a-z0-9]/gi, "_")})`}
-      dot={false} activeDot={{ r: 4 }} />
+      dot={{ r: 2, fill: l.color }} activeDot={{ r: 5 }}>
+      <LabelList dataKey={l.key} position="top" style={labelStyle(l.color)}
+        formatter={(v: unknown) => v != null ? `${v}` : ""} />
+    </Area>
   ));
 
   const renderBars = () => activeLines.map((l) => (
     <Bar key={l.key} dataKey={l.key} name={l.label}
-      fill={l.color} radius={[3, 3, 0, 0]} barSize={granularity === "yearly" ? 24 : 8} />
+      fill={l.color} radius={[3, 3, 0, 0]} barSize={granularity === "yearly" ? 24 : 8}>
+      <LabelList dataKey={l.key} position="top" style={labelStyle(l.color)}
+        formatter={(v: unknown) => v != null ? `${v}` : ""} />
+    </Bar>
   ));
 
   const renderGradients = () => activeLines.map((l) => (
@@ -364,12 +376,22 @@ export default function PrixPage() {
 
   const commonChart = {
     data: combined,
-    margin: { top: 8, right: 16, left: -10, bottom: 0 },
+    margin: { top: 16, right: 16, left: -10, bottom: 4 },
   };
+
+  // Labels X rendus en HTML pour éviter le clip SVG recharts
+  const xLabels = useMemo(() => {
+    if (!combined.length) return [];
+    const step = Math.max(1, Math.ceil(combined.length / 12));
+    return combined
+      .map((row, i) => ({ i, period: String(row.period) }))
+      .filter(({ i }) => i % step === 0 || i === combined.length - 1);
+  }, [combined]);
+
   const commonAxes = (
     <>
       <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
-      <XAxis dataKey="period" tickFormatter={tickFmt} tick={{ fontSize: 10, fill: "#94A3B8" }} axisLine={false} tickLine={false} />
+      <XAxis dataKey="period" hide />
       <YAxis tick={{ fontSize: 10, fill: "#94A3B8" }} axisLine={false} tickLine={false} />
       <Tooltip formatter={(v: number) => [`${v} CFA/kg`]} labelFormatter={(l) => formatPeriod(String(l), granularity)} contentStyle={{ borderRadius: 8, fontSize: 12 }} />
       <Legend wrapperStyle={{ fontSize: 11 }} />
@@ -380,15 +402,17 @@ export default function PrixPage() {
     </>
   );
 
+  const chartStyle = { overflow: "visible" as const };
+
   const renderChart = () => {
     if (chartType === "bar") return (
-      <BarChart {...commonChart}>{commonAxes}{renderBars()}</BarChart>
+      <BarChart {...commonChart} style={chartStyle}>{commonAxes}{renderBars()}</BarChart>
     );
     if (chartType === "line") return (
-      <LineChart {...commonChart}>{commonAxes}{renderLines()}</LineChart>
+      <LineChart {...commonChart} style={chartStyle}>{commonAxes}{renderLines()}</LineChart>
     );
     return (
-      <AreaChart {...commonChart}>
+      <AreaChart {...commonChart} style={chartStyle}>
         <defs>{renderGradients()}</defs>
         {commonAxes}{renderAreas()}
       </AreaChart>
@@ -636,7 +660,29 @@ export default function PrixPage() {
             </div>
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height={300}>{renderChart()}</ResponsiveContainer>
+          <>
+            <ResponsiveContainer width="100%" height={320}>{renderChart()}</ResponsiveContainer>
+            {/* Labels axe X en HTML (recharts SVG clippe les ticks hors zone) */}
+            <div className="relative w-full mt-1">
+              {xLabels.map(({ i, period }) => {
+                const parts = period.split("-");
+                const label = parts.length === 2
+                  ? `${MOIS_FR[parts[1]] ?? parts[1]} ${parts[0]}`
+                  : period;
+                const pct = combined.length > 1 ? (i / (combined.length - 1)) * 100 : 0;
+                return (
+                  <span
+                    key={period}
+                    className="text-[10px] text-gray-400 whitespace-nowrap"
+                    style={{ position: "absolute", left: `calc(${pct}% + 6px)`, transform: "translateX(-50%)" }}
+                  >
+                    {label}
+                  </span>
+                );
+              })}
+            </div>
+            <div className="relative h-5" />
+          </>
         )}
 
         {/* Légende seuils */}
@@ -759,41 +805,6 @@ export default function PrixPage() {
         </div>
       </div>
 
-      {/* ── Bandeau SMS/WhatsApp ── */}
-      <div className="bg-gradient-to-br from-[#1A2C42] to-[#0f1e30] rounded-2xl p-6 text-white">
-        <div className="flex items-start gap-4 flex-wrap">
-          <div className="w-10 h-10 bg-white/15 rounded-xl flex items-center justify-center shrink-0">
-            <Smartphone className="w-5 h-5 text-[#F5A623]" />
-          </div>
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2">
-              <h3 className="font-bold text-white">Collecte terrain — SMS & WhatsApp</h3>
-              <span className="text-[10px] font-semibold bg-[#F5A623]/20 text-[#F5A623] border border-[#F5A623]/30 px-2 py-0.5 rounded-full">
-                Africa's Talking configuré
-              </span>
-            </div>
-            <p className="text-white/60 text-sm mb-4 leading-relaxed">
-              Les enquêteurs envoient leurs relevés par SMS au format <code className="bg-white/10 px-1.5 py-0.5 rounded text-[#F5A623]">SORGHO SAHEL 285</code>.
-              Les données sont parsées, validées et agrégées automatiquement.
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {[
-                { icon: MessageSquare, title: "Webhook actif",       desc: "POST /api/prices/sms/at-callback" },
-                { icon: RefreshCw,     title: "Agrégation auto",     desc: "Insertion immédiate + confirmation SMS" },
-                { icon: Wifi,          title: "Monitoring admin",    desc: "/admin/prix — historique & simulateur" },
-              ].map(({ icon: Icon, title, desc }) => (
-                <div key={title} className="bg-white/8 rounded-xl p-3">
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <Icon className="w-4 h-4 text-[#F5A623]" />
-                    <span className="text-sm font-semibold text-white">{title}</span>
-                  </div>
-                  <p className="text-xs text-white/50">{desc}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

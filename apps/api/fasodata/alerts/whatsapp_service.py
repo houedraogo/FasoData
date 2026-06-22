@@ -112,11 +112,55 @@ def send_price_alert_whatsapp(
     unsubscribe_url: str,
     settings: Any,
 ) -> bool:
-    message = build_price_alert_whatsapp_message(
-        commodity=commodity,
-        region=region,
-        current_price=current_price,
-        threshold=threshold,
-        unsubscribe_url=unsubscribe_url,
-    )
-    return send_whatsapp_text(to_number=to_number, message=message, settings=settings)
+    recipient = normalize_whatsapp_number(to_number)
+    if not recipient:
+        return False
+
+    label = COMMODITY_LABELS_FR.get(commodity, commodity)
+    pct = round(((current_price - threshold) / threshold) * 100, 1)
+
+    token = getattr(settings, "whatsapp_access_token", "")
+    phone_number_id = getattr(settings, "whatsapp_phone_number_id", "")
+    base_url = getattr(settings, "whatsapp_graph_api_url", "https://graph.facebook.com/v25.0").rstrip("/")
+
+    if not token or not phone_number_id:
+        logger.info("[WHATSAPP-SIMULATION] Alerte prix %s %s %s CFA", label, region, current_price)
+        return True
+
+    try:
+        response = httpx.post(
+            f"{base_url}/{phone_number_id}/messages",
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+            json={
+                "messaging_product": "whatsapp",
+                "to": recipient,
+                "type": "template",
+                "template": {
+                    "name": "alerte_prix_fasodata",
+                    "language": {"code": "fr"},
+                    "components": [{
+                        "type": "body",
+                        "parameters": [
+                            {"type": "text", "text": label},
+                            {"type": "text", "text": region},
+                            {"type": "text", "text": str(int(current_price))},
+                            {"type": "text", "text": str(int(threshold))},
+                            {"type": "text", "text": str(pct)},
+                        ],
+                    }],
+                },
+            },
+            timeout=15,
+        )
+        response.raise_for_status()
+        logger.info("[WHATSAPP-ALERT-SENT] %s", recipient)
+        return True
+    except Exception as exc:
+        logger.error("[WHATSAPP-ALERT-ERROR] %s: %s", recipient, exc)
+        # Fallback texte brut si template non encore approuvé
+        message = build_price_alert_whatsapp_message(
+            commodity=commodity, region=region,
+            current_price=current_price, threshold=threshold,
+            unsubscribe_url=unsubscribe_url,
+        )
+        return send_whatsapp_text(to_number=to_number, message=message, settings=settings)

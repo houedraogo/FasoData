@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   Users, Globe, Database, TrendingUp, Shield,
   FileText, Settings, LogOut, ChevronRight, Mail,
-  BarChart3,
+  BarChart3, UserCheck,
 } from "lucide-react";
 import { AuthGate } from "@/components/auth/AuthGate";
 import { useAuth } from "@/hooks/useAuth";
@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
   { href: "/admin/utilisateurs", icon: Users,      label: "Utilisateurs" },
+  { href: "/admin/demandes-acces", icon: UserCheck, label: "Demandes acces" },
   { href: "/admin/organisations", icon: Globe,     label: "Organisations" },
   { href: "/admin/datasets",      icon: Database,  label: "Datasets" },
   { href: "/admin/visites",       icon: BarChart3, label: "Visites" },

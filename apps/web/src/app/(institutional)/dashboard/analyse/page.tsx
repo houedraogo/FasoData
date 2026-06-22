@@ -204,7 +204,8 @@ export default function AnalysePage() {
     return Object.entries(counts).map(([format, count]) => ({ format, count }));
   }, [datasets]);
 
-  // Historique mensuel branche sur donnees reelles uniquement.
+  // Historique mensuel: volontairement vide tant que l'API ne fournit pas
+  // de series mensuelles reelles.
   const trendData: { month: string; vues: number; telechargements: number }[] = [];
 
   // Dataset sélectionné (objet complet)
@@ -295,7 +296,7 @@ export default function AnalysePage() {
 
         {/* Tendance mensuelle */}
         <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-          <SectionTitle icon={TrendingUp} title="Tendance mensuelle — 7 derniers mois" sub="Vues et téléchargements cumulés de la plateforme" />
+          <SectionTitle icon={TrendingUp} title="Tendance mensuelle" sub="En attente de l'historique mensuel fourni par l'API" />
           {allLoading ? (
             <ChartSkeleton height={200} />
           ) : trendData.length ? (
@@ -323,9 +324,9 @@ export default function AnalysePage() {
           ) : (
             <div className="flex h-[200px] flex-col items-center justify-center rounded-2xl border border-dashed border-gray-200 text-center">
               <TrendingUp className="mb-2 h-8 w-8 text-gray-300" />
-              <p className="text-sm font-semibold text-gray-600">Historique de consultation non disponible</p>
+              <p className="text-sm font-semibold text-gray-600">Historique mensuel non disponible</p>
               <p className="mt-1 max-w-sm text-xs text-gray-400">
-                Cette courbe sera branchée quand l'API exposera les vues et téléchargements par mois.
+                Cette courbe restera vide tant que l'API ne fournit pas les vues et telechargements par mois.
               </p>
             </div>
           )}

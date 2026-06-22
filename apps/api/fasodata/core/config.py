@@ -96,6 +96,7 @@ class Settings(BaseSettings):
     whatsapp_access_token: str = ""
     whatsapp_phone_number_id: str = ""
     whatsapp_enabled: bool = True
+    whatsapp_verify_token: str = "fasodata_wh_secret_2026"
 
     @property
     def cors_origins_list(self) -> list[str]:

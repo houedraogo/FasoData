@@ -156,27 +156,44 @@ export default function PrixDuJourWidget() {
     return [{ label: c.label, pct, up, emoji: c.emoji }];
   });
 
+  const validPrices = prices.filter((p) => p.price > 0);
+  const totalObservations = validPrices.reduce((sum, p) => sum + (p.n_obs ?? 0), 0);
+  const latestPriceDate = validPrices
+    .map((p) => p.price_date)
+    .filter(Boolean)
+    .sort()
+    .at(-1);
+  const latestPriceDateLabel = latestPriceDate
+    ? new Date(latestPriceDate).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })
+    : "-";
+  const sourceLabel = validPrices.some((p) => `${p.source ?? ""} ${p.data_origin ?? ""}`.toLowerCase().includes("wfp"))
+    ? "HDX/WFP"
+    : "Source API";
+  const networkStats = [
+    { icon: Database, label: "Observations WFP", value: totalObservations > 0 ? totalObservations.toLocaleString("fr-FR") : "-" },
+    { icon: TrendingUp, label: "Produits avec prix", value: `${validPrices.length}/${COMMODITIES.length}` },
+    { icon: RefreshCw, label: "Date de reference", value: latestPriceDateLabel },
+    { icon: MapPin, label: "Source", value: sourceLabel },
+  ];
+
   return (
     <section className="bg-white border-b border-gray-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
 
-        {/* ── Bannière réseau terrain ── */}
+        {/* Banniere donnees prix */}
         <div className="mb-8 rounded-2xl bg-[#1A2C42] px-5 py-4 flex flex-wrap items-center gap-4 justify-between">
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-            <span className="text-white font-bold text-sm">Réseau FasoData — Données terrain</span>
+            <span className="text-white font-bold text-sm">Prix alimentaires publics - donnees WFP</span>
           </div>
           <div className="flex flex-wrap gap-5">
-            {[
-              { icon: "👥", label: "Contributeurs actifs", value: "1 284" },
-              { icon: "📍", label: "Marchés couverts",     value: "67" },
-              { icon: "📦", label: "Relevés aujourd'hui",  value: "3 542" },
-              { icon: "🏅", label: "Fiabilité moyenne",    value: "96,8 %" },
-            ].map(({ icon, label, value }) => (
+            {networkStats.map(({ icon: Icon, label, value }) => (
               <div key={label} className="flex items-center gap-2">
-                <span className="text-base">{icon}</span>
+                <Icon className="h-4 w-4 text-white/70" />
                 <div>
-                  <p className="text-white font-bold text-sm leading-none">{value}</p>
+                  <p className="text-white font-bold text-sm leading-none">
+                    {loading ? <span className="inline-block h-3 w-12 rounded bg-white/20 align-middle" /> : value}
+                  </p>
                   <p className="text-white/50 text-[10px]">{label}</p>
                 </div>
               </div>
@@ -192,7 +209,7 @@ export default function PrixDuJourWidget() {
             </h2>
             <p className="text-sm text-gray-500 mt-0.5 flex items-center gap-2">
               <MapPin className="w-3.5 h-3.5" />
-              Moyenne nationale · Enquêtes terrain + HDX/WFP
+              Moyenne nationale - source publique HDX/WFP
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -340,7 +357,7 @@ export default function PrixDuJourWidget() {
                       {/* Nombre de relevés */}
                       {hasPrice && nObs && (
                         <p className="text-[11px] text-gray-500 font-medium mb-1">
-                          {nObs.toLocaleString("fr-FR")} relevés terrain
+                          {nObs.toLocaleString("fr-FR")} observations WFP
                         </p>
                       )}
 
@@ -416,7 +433,7 @@ export default function PrixDuJourWidget() {
         {/* Footer */}
         <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100 flex-wrap gap-2">
           <p className="text-xs text-gray-400">
-            Sources : enquêtes terrain FasoData · HDX/WFP Food Prices · SONAGESS
+            Source affichee : HDX/WFP Food Prices, via l'API FasoData.
           </p>
           <Link href="/dashboard/prix"
             className="flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-[#E04E2F] transition-colors">
